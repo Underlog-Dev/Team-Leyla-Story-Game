@@ -163,6 +163,49 @@ function zombie(g, x, y, shirt, i) {
   return s + '</g>';
 }
 
+// Story characters (NPCs). Looks come from each adventure's npcs table.
+function npcSprite(n, x) {
+  const P = (px, py, w, h, c) => `<rect x="${x + px}" y="${py}" width="${w}" height="${h}" fill="${c}"/>`;
+  let o = '<g class="hero">';
+  if (n.kind === 'dog') {
+    const c = n.coat || '#c8a26b', d = shade(c, -0.3);
+    o += P(1, 44, 8, 4, c) + P(7, 41, 4, 4, c) + P(10, 43, 2, 1, '#1c1c1c') + P(8, 42, 1, 1, '#1c1c1c') + P(7, 40, 1, 2, d) + P(0, 43, 2, 1, d) + P(1, 48, 1, 3, d) + P(3, 48, 1, 3, d) + P(6, 48, 1, 3, d) + P(8, 48, 1, 3, d) + P(5, 45, 2, 1, '#e63946');
+    return o + '</g>';
+  }
+  if (n.kind === 'parrot') {
+    o += P(1, 40, 4, 7, '#e63946') + P(2, 38, 3, 3, '#e63946') + P(1, 39, 1, 1, '#f1faee') + P(0, 40, 1, 1, '#ffd166') + P(4, 43, 2, 3, '#4d96ff') + P(2, 47, 2, 3, '#ffd166') + P(1, 50, 4, 1, '#5e3b23');
+    if (n.hat) o += P(1, 36, 4, 2, '#1b1b22') + P(2, 36, 2, 1, '#ffd166');
+    return o + '</g>';
+  }
+  const sk = n.skin || '#e0a878', hr = n.hair || '#3b2417', sh = n.shirt || '#457b9d', lg = n.legs || '#2b2d42';
+  const y = 36;
+  // head
+  o += P(1, y + 1, 7, 6, sk) + P(2, y + 3, 1, 1, '#1c1c1c') + P(6, y + 3, 1, 1, '#1c1c1c') + P(3, y + 5, 3, 1, shade(sk, -0.35));
+  const st = n.style || 'short';
+  if (st !== 'bald') o += P(1, y, 7, 2, hr);
+  if (st === 'long') o += P(0, y + 1, 1, 7, hr) + P(8, y + 1, 1, 7, hr);
+  if (st === 'bun') o += P(3, y - 1, 3, 1, hr);
+  if (n.beard) o += P(1, y + 5, 7, 2, n.beard) + P(3, y + 5, 3, 1, shade(sk, -0.35));
+  const hat = n.hat;
+  const hc = n.hatC || '#1b1b22';
+  if (hat === 'cap') o += P(1, y - 1, 7, 2, hc) + P(0, y + 1, 4, 1, shade(hc, -0.3));
+  if (hat === 'helmet') o += P(1, y - 1, 7, 3, hc) + P(0, y + 1, 9, 1, shade(hc, -0.3));
+  if (hat === 'chef') o += P(2, y - 4, 5, 4, '#f7f7fa') + P(1, y - 1, 7, 2, '#f7f7fa');
+  if (hat === 'wide') o += P(2, y - 2, 5, 2, hc) + P(-1, y, 11, 1, hc);
+  if (hat === 'captain') o += P(1, y - 1, 7, 2, '#f7f7fa') + P(1, y + 1, 7, 1, '#1b1b22') + P(4, y - 1, 1, 1, '#ffd166');
+  // body
+  o += P(1, y + 7, 7, 6, sh) + P(0, y + 8, 1, 4, sh) + P(8, y + 8, 1, 4, sh) + P(0, y + 12, 1, 1, sk) + P(8, y + 12, 1, 1, sk);
+  if (n.extra === 'apron') o += P(2, y + 9, 5, 4, '#f7f7fa');
+  if (n.extra === 'hivis') o += P(1, y + 9, 7, 1, '#e9ecef') + P(1, y + 11, 7, 1, '#e9ecef');
+  if (n.extra === 'stripes') for (let j = 0; j < 6; j += 2) o += P(1, y + 7 + j, 7, 1, '#f7f7fa');
+  if (n.extra === 'coat') o += P(4, y + 7, 1, 6, shade(sh, -0.35));
+  if (n.extra === 'tie') o += P(4, y + 7, 1, 4, '#9d0208');
+  if (n.extra === 'gown') return o + P(1, y + 13, 7, 3, sh) + P(0, y + 15, 9, 1, shade(sh, -0.2)) + '</g>';
+  // legs
+  o += P(2, y + 13, 2, 2, lg) + P(5, y + 13, 2, 2, lg) + P(2, y + 15, 2, 1, '#1c1c1c') + P(5, y + 15, 2, 1, '#1c1c1c');
+  return o + '</g>';
+}
+
 const LIGHT = {
   night: '<rect width="96" height="54" fill="#0a1033" opacity="0.38"/>',
   dim: '<rect width="96" height="54" fill="#000" opacity="0.32"/>',
@@ -179,11 +222,16 @@ export function sceneSVG(scene, party = [], { stage = 0, cls = '' } = {}) {
   const g = canvas(name + ':' + (stage % 7));
   try { SCENES[name](g, scene || {}); } catch { /* keep partial drawing */ }
   let out = g.out();
-  // zombies on the right
-  const z = Math.min(6, scene?.z || 0);
-  for (let i = 0; i < z; i++) out += zombie(g, 86 - i * 9 - (i % 2) * 2, 36 + (i % 2) * 2, ZSHIRTS[(i + stage) % ZSHIRTS.length], i);
-  // cast portraits standing at the bottom left (alive only)
-  const cast = party.slice(0, 6);
+  // layout: team on the left, story characters in the middle, zombies on the right
+  const npcs = (scene?.npcs || []).slice(0, 3);
+  let z = Math.min(6, scene?.z || 0);
+  const npcW = npcs.reduce((w, n) => w + (n.kind === 'parrot' ? 7 : n.kind === 'dog' ? 12 : 10), 0);
+  while (z > 1 && 4 + 22 + npcW + z * 9 > 94) z--;
+  for (let i = 0; i < z; i++) out += zombie(g, 85 - i * 9, 36 + (i % 2) * 2, ZSHIRTS[(i + stage) % ZSHIRTS.length], i);
+  let nx = 93 - z * 9 - npcW;
+  for (const n of npcs) { out += npcSprite(n, nx); nx += n.kind === 'parrot' ? 7 : n.kind === 'dog' ? 12 : 10; }
+  const room = Math.max(1, Math.floor((93 - z * 9 - npcW - 3) / 11));
+  const cast = party.slice(0, Math.min(6, room));
   cast.forEach((c, i) => {
     const x = 3 + i * 11, y = 37;
     out += `<g class="hero" style="animation-delay:${i * 0.2}s"><rect x="${x + 2}" y="${y + 10}" width="6" height="5" fill="${avatarBg(c.avatar)}"/><rect x="${x + 2}" y="${y + 14}" width="6" height="1" fill="#000" opacity="0.3"/><svg x="${x}" y="${y}" width="10" height="10" viewBox="0 0 16 16">${avatarInner(c.avatar, false)}</svg></g>`;

@@ -1,5 +1,5 @@
 // ADVENTURE 3: THE LAST VOYAGE — infected cruise ship, escape and reach the mainland.
-import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES } from './kit.js';
+import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue } from './kit.js';
 
 const A = 'voy';
 const E = (id, o) => ({ id: `${A}_${id}`, ...o });
@@ -171,6 +171,7 @@ const events = [
     ],
   }),
   E('casino_parrot', {
+    npc: ['admiral'],
     cat: 'rescue', loc: 'casino', title: `The Admiral`,
     text: [`A scarlet macaw sits on the roulette wheel, wearing a tiny captain's hat. "AHOY," it shrieks. "AHOY. ABANDON SHIP. BRAAAINS." A tag on its leg reads: ADMIRAL — PROPERTY OF CAPT. MOREAU.`],
     cast: ['a', 'b?'], say: [['a', `"Did that parrot just say brains?"`], ['b', `"I would follow that bird into battle."`, 'Funny']],
@@ -186,6 +187,7 @@ const events = [
 
   // ---------------- GALLEY ----------------
   E('galley_bruno', {
+    npc: ['bruno'],
     cat: 'rescue', loc: 'galley', title: `Chef Bruno`,
     text: [`In the galley, a huge chef in a stained white jacket is holding the kitchen door shut with his back, a ladle in each hand. "You! Help me! They want into my kitchen! NOBODY comes into my kitchen!" His name tag says BRUNO.`],
     scene: { z: 2 }, cast: ['a', 'b?:Foodie'], say: [['b', `"Chef! I love your work! The soufflé on Tuesday changed my life!"`, 'Foodie'], ['a', `"Bruno, the ship is sinking."`]],
@@ -213,6 +215,7 @@ const events = [
 
   // ---------------- THEATRE ----------------
   E('theatre_show', {
+    npc: ['delphine'],
     cat: 'humour', loc: 'theatre', title: `The Show Must Go On`,
     text: [`In the Neptune Theatre, a single spotlight shines on the stage, where a singer in a sequinned gown is belting out a ballad to a thousand empty seats. Except they are not all empty. Some of them are swaying.`],
     scene: { z: 3, light: 'dim' }, cast: ['a', 'b?'], say: [['a', `"She is still singing. They are listening. They are... enjoying it?"`], ['b', `"Honestly she is very good."`, 'Funny']],
@@ -267,6 +270,7 @@ const events = [
 
   // ---------------- MEDBAY ----------------
   E('medbay_anand', {
+    npc: ['anand'],
     cat: 'rescue', loc: 'medbay', title: `Dr Anand`,
     text: [`The Medical Centre is a wreck, but at the back, behind a locked glass door, a doctor in a mask is working at a microscope. She looks up. "Doctor Priya Anand. Are any of you bitten or scratched? Be honest. It matters."`],
     cast: ['a', 'b?:Medic'], say: [['b', `"Doctor, can I help? I have first aid training."`, 'Medic'], ['a', `"We are heading for the lifeboats. Come with us."`]],
@@ -307,6 +311,7 @@ const events = [
     ],
   }),
   E('crew_giles', {
+    npc: ['giles'],
     cat: 'interaction', loc: ['crew', 'corridor7', 'casino'], req: { not: ['npc_giles'] }, title: `Purser Giles`,
     text: [`A man in an immaculate officer's uniform steps out of a doorway, smoothing his hair. "Purser Giles. Thank heavens, passengers. I can get you to a lifeboat. Officers know the quick way. Stay close to me."`],
     cast: ['a', 'b?'], say: [['b', `"His uniform is suspiciously clean."`, 'Intelligent'], ['b', `"An officer! We are saved!"`, 'Nervous']],
@@ -403,6 +408,7 @@ const events = [
 
   // ---------------- BRIDGE ----------------
   E('bridge_captain', {
+    npc: ['moreau'],
     cat: 'moral', loc: 'bridge', title: `Captain Moreau`, major: true,
     text: [`On the bridge, Captain Moreau sits in his chair, staring at the black sea, a bottle in his hand. His arm is bandaged. "I knew," he says, without turning. "I got the message before we sailed. I sailed anyway. It is all in the log." He taps a leather book beside him.`],
     scene: { light: 'night' }, cast: ['a', 'b?'], say: [['a', `"You knew? You knew, and you sailed?"`], ['b', `"Is that bandage hiding a bite, Captain?"`, 'Intelligent']],
@@ -430,6 +436,7 @@ const events = [
 
   // ---------------- LIFEBOATS ----------------
   E('lb_crowd', {
+    npc: ['passenger', 'passenger'],
     cat: 'moral', loc: 'lifeboats', title: `Every Seat Counts`, major: true,
     text: [`The lifeboat station is chaos. Passengers fight over the last boats. A crew officer with a megaphone shouts: "Women and children first! No! Everybody! Just GET IN!" A lifeboat swings out, half full. Infected are coming down the deck.`],
     scene: { z: 3 }, cast: ['a', 'b?'], say: [['a', `"There! That boat has space!"`], ['b', `"Help the others first. Please."`, 'Kind']],
@@ -472,6 +479,7 @@ const events = [
     ],
   }),
   E('prom_quartet', {
+    npc: ['musician', 'musician'],
     cat: 'interaction', loc: 'promenade', title: `The Quartet`,
     text: [`Under the promenade awning, a string quartet in soaked dinner jackets is still playing, eyes closed, completely absorbed. The cellist nods to {team} without missing a note.`],
     cast: ['a', 'b?'], say: [['a', `"They are still playing."`], ['b', `"Somehow that is the most comforting and the most terrifying thing I have ever seen."`, 'Sarcastic']],
@@ -602,7 +610,8 @@ const events = [
     ],
   }),
   E('giles_twist', {
-    cat: 'interaction', loc: '*', req: { flags: ['npc_giles'] }, stage: [12, 40], title: `The Purser's Proposal`, major: true,
+    npc: ['giles'],
+    cat: 'interaction', loc: '*', req: { flags: ['npc_giles'], npcIs: ['giles', 'traitor'] }, stage: [12, 40], title: `The Purser's Proposal`, major: true,
     text: [`Purser Giles pulls {a} aside, speaking fast and low. "Listen. Lifeboat 14 seats twelve. There are hundreds of passengers. If we go now, just us, quietly, nobody needs to know. The others will slow us down."`],
     cast: ['a', 'b?'], say: [['a', `"Giles, what are you saying?"`]],
     choices: [
@@ -614,6 +623,7 @@ const events = [
     ],
   }),
   E('bruno_cooks', {
+    npc: ['bruno'],
     cat: 'interaction', loc: '*', req: { flags: ['npc_bruno'] }, title: `Bruno's Kitchen`,
     text: [`Chef Bruno ducks into a deserted bar, rummages behind the counter, and emerges with a tray. "Nobody fights on an empty stomach. Eat. EAT."`],
     cast: ['a'], say: [['a', `"Bruno, I love you."`]],
@@ -626,6 +636,7 @@ const events = [
     ],
   }),
   E('admiral_warns', {
+    npc: ['admiral'],
     cat: 'humour', loc: '*', req: { flags: ['npc_admiral'] }, title: `The Admiral Speaks`,
     text: [`The Admiral suddenly puffs up his feathers and screams: "DANGER! DANGER! STARBOARD!" A second later, a door on the right bursts open.`],
     scene: { z: 1 }, cast: ['a'], say: [['a', `"Good bird. GOOD BIRD."`]],
@@ -639,6 +650,7 @@ const events = [
     ],
   }),
   E('anand_care', {
+    npc: ['anand'],
     cat: 'interaction', loc: '*', req: { flags: ['npc_anand'], injured: true }, title: `Doctor's Orders`,
     text: [`Dr Anand stops the group in a quiet stairwell. "Sit. Everyone who is hurt, sit down now. I am not losing anyone to an infected cut."`],
     cast: ['a'], say: [['a', `"Yes, Doctor."`]],
@@ -688,6 +700,7 @@ const events = [
     ],
   }),
   E('any_mime', {
+    npc: ['mime'],
     cat: 'humour', loc: '*', title: `The Mime`,
     text: [`The ship's entertainer, a mime in white face paint, is trapped in an invisible box in the middle of the corridor. Either it is a very committed performance, or something is very wrong. It is hard to tell.`],
     scene: { z: 1 }, cast: ['a', 'b?'], say: [['a', `"Is he infected or just doing mime?"`], ['b', `"With mimes, honestly, who can say."`, 'Sarcastic']],
@@ -761,6 +774,7 @@ const events = [
       C(`Run and leave {t}`, `Save yourselves.`, [O(0.5, 'hurt', `{t} escapes alone, hurt, and catches up later in silence.`, [['hurt', 't', 1]]), O(0.25, 'good', `{t} gets away alone. Nobody can look them in the eye.`), O(0.25, 'death', `{t} does not catch up.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} ducks into the next cabin`, `Get a door between you.`, [O(0.55, 'good', `{t} dives into the next cabin and locks the door. It loses interest.`), O(0.35, 'hurt', `It gets an arm through before the door shuts. {t} is scratched.`, [['hurt', 't', 1]]), O(0.1, 'death', `The cabin is already occupied.`, [['bite', 't']])]),
       C(`{t} grabs a deck chair and swings`, `Anything will do.`, [O(0.55, 'good', `A deck chair across the head. It goes down.`, [['hero']]), O(0.35, 'hurt', `The chair folds up. Of course it does. {t} wrestles free, scratched.`, [['hurt', 't', 1], ['funny']]), O(0.1, 'death', `The chair folds, and so does {t}'s luck.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`BANG. The pistol shot drops it. {t} is saved. The sound echoes down every corridor on the deck.`, [['next', 'voy_gun_echo'], ['hero']]),
@@ -782,6 +796,7 @@ const events = [
       C(`Leave {t}`, `Save yourselves.`, [O(0.5, 'hurt', `{t} kicks free alone and limps after the group.`, [['hurt', 't', 2]]), O(0.5, 'death', `By the time anyone looks back, it is too late.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} plays dead`, `Go limp.`, [O(0.45, 'funny', `{t} goes floppy. Confused, it lets go. {t} crawls away.`, [['funny']]), O(0.43, 'hurt', `It is not fooled. {t} fights free, scratched.`, [['hurt', 't', 1]]), O(0.12, 'death', `Playing dead does not work.`, [['bite', 't']])]),
       C(`{t} slips out of the shoe`, `Wriggle free.`, [O(0.5, 'funny', `{t} pops out of their loafer. It is left holding a very expensive shoe.`, [['funny']]), O(0.4, 'hurt', `{t} twists free, wrenching an ankle.`, [['hurt', 't', 1]]), O(0.1, 'death', `The shoe will not come off.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`One shot down through the railings. The grip goes slack. Every infected on both decks heard it.`, [['next', 'voy_gun_echo'], ['hero']]),
@@ -802,6 +817,7 @@ const events = [
       C(`Leave {t} to it`, `Too many.`, [O(0.4, 'hurt', `{t} fights free alone, badly hurt.`, [['hurt', 't', 2]]), O(0.3, 'good', `{t} gets out alone and is furious.`), O(0.3, 'death', `{t} does not make it.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} slides down the banister`, `Fast and stylish.`, [O(0.5, 'funny', `{t} slides down three flights of banister like a child at Christmas, straight past them all.`, [['funny']]), O(0.4, 'hurt', `{t} slides off at the bend and hits the wall.`, [['hurt', 't', 1], ['funny']]), O(0.1, 'death', `{t} slides straight into the arms of one at the bottom.`, [['bite', 't']])]),
       C(`{t} holds them off with a fire hose`, `There is a hose reel on the wall.`, [O(0.5, 'good', `A blast of water sends them tumbling down the stairs.`, [['hero']]), O(0.4, 'hurt', `The hose has no pressure. {t} fights free.`, [['hurt', 't', 1]]), O(0.1, 'death', `The hose is dry.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`Shots ring out in the stairwell, deafening. They fall. {t} stands in the ringing silence, and then the echoes come back from every deck.`, [['next', 'voy_gun_echo'], ['hero']]),
@@ -862,6 +878,7 @@ const events = [
     text: [`Lifeboat 14 swings at deck level, ready. The Aurora Star is listing badly now, rails dipping toward the black water. Infected are pouring onto the boat deck from both stairwells. This is the moment.`],
     scene: { bg: 'lifeboats', z: 4, light: 'night' }, cast: ['a', 'b?'], say: [['a', `"Everybody in! NOW!"`], ['b', `"I will cast off the ropes. Get in!"`, 'Brave'], ['b', `"Final escape sequence. Do NOT mess this up."`, 'Gamer']],
     choices: [
+      C(`Look for Giles`, `Where is the purser?`, [O(1, 'bad', `Giles is already in Lifeboat 14 with the engine running. He casts off, alone. "Sorry. Officers first."`, [['flag', 'betrayed']])], { req: { flags: ['giles_deal'] } }),
       C(`Pile into the lifeboat and drop it`, `Everyone in, release, fall.`, [O(0.6, 'good', `A heart-stopping drop, a huge splash, and the lifeboat is in the water, away from the ship.`, [['flag', 'launched']]), O(0.3, 'hurt', `The boat drops too fast and slams into the sea. {r} is thrown against the bench.`, [['hurt', 'r', 1], ['flag', 'launched']]), O(0.1, 'death', `As the boat drops, an infected grabs {r} from the deck and pulls them back.`, [['bite', 'r'], ['flag', 'launched']])]),
       C(`Lower it properly with the winch key`, `Smooth and controlled.`, [O(1, 'good', `The davits whirr. The boat glides down to the water like an elevator. Perfect.`, [['flag', 'launched']])], { req: { items: ['winch_key'] } }),
       C(`Launch from the tender bay hull door`, `Straight out at sea level.`, [O(1, 'good', `The hull door opens. The boat motors straight out onto the sea, quiet as a ghost.`, [['flag', 'launched']])], { req: { flags: ['hull_door'] } }),
@@ -869,7 +886,6 @@ const events = [
       C(`Jump overboard and swim to a floating boat`, `There is an empty lifeboat already in the water.`, [O(0.5, 'good', `A long, cold jump and a short, terrifying swim. Everyone hauls into the drifting lifeboat.`, [['flag', 'launched']]), O(0.4, 'hurt', `The water is freezing. {r} is battered against the hull before making it to the boat.`, [['hurt', 'r', 1], ['flag', 'launched']]), O(0.1, 'death', `The cold takes {r}'s breath away. They do not reach the boat.`, [['kill', 'r', 'was lost in the cold sea jumping from the ship']], )]),
       C(`Cut the ropes with an axe`, `Drop it the fast way.`, [O(0.7, 'good', `Thunk, thunk. The boat drops and lands upright. Away.`, [['flag', 'launched']]), O(0.3, 'hurt', `It lands at an angle. {r} is thrown into the sea and dragged back aboard.`, [['hurt', 'r', 1], ['flag', 'launched']])]),
       C(`Wait for the last stragglers`, `There are still passengers running for the boat.`, [O(0.5, 'good', `Six more passengers tumble in. Then {team} launches, full to the brim.`, [['hero'], ['flag', 'launched']]), O(0.5, 'hurt', `The infected arrive with the stragglers. {r} is hurt holding them back.`, [['hurt', 'r', 1], ['hero'], ['flag', 'launched']])]),
-      C(`Look for Giles`, `Where is the purser?`, [O(1, 'bad', `Giles is already in Lifeboat 14 with the engine running. He casts off, alone. "Sorry. Officers first."`, [['flag', 'betrayed']])], { req: { flags: ['giles_deal'] } }),
       C(`Slide down the falls ropes to a boat in the water`, `Rope burn is better than teeth.`, [O(0.6, 'good', `Hand over hand down the ropes, and into a half-empty lifeboat below.`, [['flag', 'launched']]), O(0.4, 'hurt', `{r} loses their grip halfway and drops into the boat.`, [['hurt', 'r', 1], ['flag', 'launched']])]),
     ],
     uses: {
@@ -933,7 +949,18 @@ export default {
   finale: [`${A}_fin_launch`, `${A}_fin_crossing`], finaleLoc: 'sea',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
   turnEvent: `${A}_turn`, timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`, turnDelay: 4,
-  items, locations, events, defaultLoot: ['bandages', 'canapes', 'lifejackets', 'batteries'],
+  npcs: {
+    bruno: { name: `Chef Bruno`, traitor: 0.07, loyal: 0.7, skin: '#eeb48b', hair: '#1c1b20', hat: 'chef', shirt: '#f7f7fa', legs: '#2b2d42', extra: 'apron', beard: '#1c1b20' },
+    delphine: { name: `Delphine`, traitor: 0.15, loyal: 0.5, skin: '#734125', hair: '#1c1b20', style: 'long', shirt: '#e468a8', extra: 'gown' },
+    admiral: { name: `the Admiral`, traitor: 0, loyal: 0.8, kind: 'parrot', hat: true },
+    anand: { name: `Dr Anand`, traitor: 0.05, loyal: 0.75, skin: '#ad6d3e', hair: '#1c1b20', style: 'bun', shirt: '#f7f7fa', legs: '#2b2d42', extra: 'coat' },
+    giles: { name: `Purser Giles`, traitor: 0.5, loyal: 0.2, skin: '#f8cba6', hair: '#d0661f', hat: 'captain', shirt: '#1d3557', legs: '#1d3557' },
+    moreau: { name: `Captain Moreau`, traitor: 0.3, loyal: 0.3, skin: '#eeb48b', hair: '#9b9aa3', hat: 'captain', shirt: '#f7f7fa', legs: '#f7f7fa', beard: '#9b9aa3' },
+    musician: { name: `the cellist`, traitor: 0.05, loyal: 0.5, hair: '#3b2417', shirt: '#1b1b22', legs: '#1b1b22', extra: 'tie' },
+    passenger: { name: `the passenger`, traitor: 0.2, loyal: 0.4, skin: '#c98552', hair: '#6b3e1f', style: 'long', shirt: '#f77f00', legs: '#2b2d42' },
+    mime: { name: `the mime`, traitor: 0.25, loyal: 0.4, skin: '#f7f7fa', style: 'bald', hat: 'cap', hatC: '#1b1b22', shirt: '#1b1b22', legs: '#1b1b22', extra: 'stripes' },
+  },
+  items, locations, events: [...events, ...companionEvents(A)], defaultLoot: ['bandages', 'canapes', 'lifejackets', 'batteries'],
   travelText: [`{loc} is behind {team} now. Three ways lead aft toward the lifeboats. The ship sinks in {clock}.`, `Time to leave {loc}. Which way now? {clock} before the Aurora Star goes under.`],
   travelSay: [['a', [`"Which way? Quickly."`, `"Pick a route. The water is rising."`, `"Aft. Lifeboats are aft. Which way is aft?"`]]],
   travelOutcomes: T,

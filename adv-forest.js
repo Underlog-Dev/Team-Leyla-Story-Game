@@ -1,5 +1,5 @@
 // ADVENTURE 2: DEADWOOD FOREST — wilderness outbreak, reach the ranger station beacon.
-import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES } from './kit.js';
+import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue } from './kit.js';
 
 const A = 'dwf';
 const E = (id, o) => ({ id: `${A}_${id}`, ...o });
@@ -115,6 +115,7 @@ const events = [
     ],
   }),
   E('lake_birdwatcher', {
+    npc: ['pemberton'],
     cat: 'rescue', loc: 'lake', title: `The Birdwatcher`,
     text: [`A man in a hide by the lake is peering through enormous binoculars, completely unaware of the apocalypse. "Shh! A great crested grebe!" His name is Pemberton. He has been in the hide since Thursday.`],
     cast: ['a', 'b?:Nature lover'], say: [['b', `"Oh! A grebe! Where?"`, 'Nature lover'], ['a', `"Pemberton, there are zombies."`]],
@@ -142,6 +143,7 @@ const events = [
     ],
   }),
   E('trail_hunter', {
+    npc: ['wade'],
     cat: 'interaction', loc: 'trail', req: { not: ['npc_wade'] }, title: `Wade`,
     text: [`A man in camouflage steps out from behind a tree, rifle raised. "Easy. Name's Wade. I hunt these woods." He lowers the gun. "I know a quick way to the ranger station. But I'm not going alone."`],
     cast: ['a', 'b?'], say: [['b', `"He has very shifty eyes."`, 'Sarcastic'], ['b', `"A local guide? We should trust him."`, 'Kind']],
@@ -168,6 +170,7 @@ const events = [
     ],
   }),
   E('cabins_hazel', {
+    npc: ['hazel'],
     cat: 'rescue', loc: 'cabins', title: `Hazel`,
     text: [`An old woman sits on the porch of the last cabin, knitting. A shotgun leans against her chair. "Hazel," she says. "Lived here forty years. Seen bears, fires and floods. This is new." She does not stop knitting.`],
     cast: ['a', 'b?:Kind'], say: [['b', `"Come with us, Hazel. It is not safe."`, 'Kind'], ['a', `"Do you know the way to the ranger station?"`]],
@@ -319,6 +322,7 @@ const events = [
 
   // ---------------- OUTPOST 7 ----------------
   E('outpost_dale', {
+    npc: ['dale'],
     cat: 'rescue', loc: 'outpost', title: `Ranger Dale`, major: true,
     text: [`Inside Ranger Outpost 7, a ranger is slumped against the radio desk, his leg wrapped in a blood-soaked bandage. "Dale," he gasps. "I made the broadcast. Beacon at the main station needs power. Fuse or generator fuel. My keycard opens the locker there."`],
     scene: { bg: 'outpost' }, cast: ['a', 'b?:Medic'], say: [['b', `"Let me look at that leg. It is not a bite. It is a bad cut."`, 'Medic'], ['a', `"We will get you to the station, Dale."`]],
@@ -388,6 +392,7 @@ const events = [
     ],
   }),
   E('road_roadblock', {
+    npc: ['camper', 'camper'],
     cat: 'moral', loc: 'road', title: `The Roadblock`,
     text: [`A group of campers has built a roadblock from cars across the forest road. They are armed with fishing knives and fear. "Nobody passes!" shouts their leader. "Could be infected. Turn around."`],
     cast: ['a', 'b?'], say: [['a', `"We are not infected. We are heading for the ranger station."`], ['b', `"They are scared. Talk to them gently."`, 'Kind']],
@@ -562,6 +567,7 @@ const events = [
     ],
   }),
   E('any_injured_hiker', {
+    npc: ['hiker'],
     cat: 'moral', loc: '*', title: `The Injured Hiker`, major: true,
     text: [`A hiker lies at the bottom of a slope, one leg twisted badly. "Please," he calls. "I fell. I am not bitten, I swear. I just cannot walk." Behind him, in the trees, shapes are moving.`],
     scene: { z: 2 }, cast: ['a', 'b?:Kind'], say: [['b', `"We cannot leave him. We just cannot."`, 'Kind'], ['a', `"They are coming. We have about a minute."`]],
@@ -575,7 +581,8 @@ const events = [
     ],
   }),
   E('wade_twist', {
-    cat: 'interaction', loc: '*', req: { flags: ['npc_wade'] }, stage: [10, 40], title: `Wade's Real Plan`, major: true,
+    npc: ['wade'],
+    cat: 'interaction', loc: '*', req: { flags: ['npc_wade'], npcIs: ['wade', 'traitor'] }, stage: [10, 40], title: `Wade's Real Plan`, major: true,
     text: [`Wade has been quiet all afternoon. Now he stops and turns, rifle in his hands. "Here's the thing. That beacon calls one helicopter. One. And I'm going to be on it." He looks at the backpack.`],
     cast: ['a', 'b?'], say: [['a', `"Wade. Think about this."`], ['b', `"I KNEW it. I knew it from the eyebrows."`, 'Sarcastic']],
     choices: [
@@ -587,6 +594,7 @@ const events = [
     ],
   }),
   E('pemberton_birds', {
+    npc: ['pemberton'],
     cat: 'humour', loc: '*', req: { flags: ['npc_pemberton'] }, title: `Pemberton's Warning`,
     text: [`Pemberton suddenly stops, binoculars up. "The crows," he whispers. "Look at the crows. They gather over the infected. They always do. There, and there. We should go between them."`],
     cast: ['a'], say: [['a', `"Pemberton, you beautiful nerd."`]],
@@ -599,6 +607,7 @@ const events = [
     ],
   }),
   E('dale_shortcut', {
+    npc: ['dale'],
     cat: 'interaction', loc: '*', req: { flags: ['npc_dale'] }, title: `Dale's Path`,
     text: [`Ranger Dale points to a gap in a fence with a faded sign: FIREBREAK — NO PUBLIC ACCESS. "Fire road. Cuts straight east. Nobody uses it."`],
     cast: ['a'], say: [['a', `"Lead the way, Dale."`]],
@@ -722,12 +731,13 @@ const events = [
     ],
   }),
   E('any_ramblers', {
+    npc: ['joan', 'rambler'],
     cat: 'rescue', loc: '*', title: `The Ramblers`,
     text: [`Out of the trees march six pensioners in matching purple fleeces, walking poles clicking in unison. "Afternoon!" says their leader, a tiny woman called Joan. "Wellbrook Ramblers. We're doing the long loop. Bit busy today, isn't it?"`],
     cast: ['a', 'b?:Kind'], say: [['b', `"We need to get them to safety."`, 'Kind'], ['a', `"Joan, have you seen any... unusual walkers today?"`]],
     choices: [
       C(`Warn them and send them to the road`, `Point them out of the forest.`, [O(1, 'good', `Joan listens, nods briskly, and reorganises the Ramblers into a defensive formation. "Right. Poles up." They give {team} {loot}.`, [['loot'], ['hero']])]),
-      C(`Walk with them for a while`, `Strength in numbers.`, [O(0.7, 'good', `The Ramblers set a brutal pace and know a shortcut through the heather.`, [['time', 1]]), O(0.3, 'funny', `The Ramblers stop every five minutes to identify a mushroom. It costs time, but nobody dares complain.`, [['time', -1], ['funny']])]),
+      C(`Walk with them for a while`, `Strength in numbers.`, [O(0.7, 'good', `The Ramblers set a brutal pace and know a shortcut through the heather. Joan decides she is coming all the way to the station. "Someone has to keep you lot moving."`, [['time', 1], ['npc', 'joan']]), O(0.3, 'funny', `The Ramblers stop every five minutes to identify a mushroom. It costs time, but nobody dares complain.`, [['time', -1], ['funny']])]),
       C(`Ask Joan for directions`, `Ramblers know every path.`, [O(1, 'good', `"Ranger station? Left at the split oak, then follow the old wall." Precise and correct.`, [['time', 1]])]),
       safe(`Wave and carry on`, `They seem to be coping.`, { t: `"Lovely day for it!" Joan calls after them.` }),
       C(`Ask them to share supplies`, `They are very well prepared.`, [O(1, 'item', `Joan produces {loot} from a bottomless rucksack. "Always prepared, dear."`, [['item', 'first_aid']])]),
@@ -784,6 +794,7 @@ const events = [
       C(`Run and leave {t}`, `Save yourselves.`, [O(0.5, 'hurt', `{t} escapes alone and catches up later, hurt and silent.`, [['hurt', 't', 1]]), O(0.25, 'good', `{t} gets away alone. Nobody can look them in the eye.`), O(0.25, 'death', `{t} does not catch up.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} climbs the nearest tree`, `Get off the ground.`, [O(0.55, 'good', `{t} scrambles up the branches like a squirrel. It claws at the bark below, then gives up.`, [['funny']]), O(0.35, 'hurt', `{t} gets up, but not before it gets a grip on one ankle.`, [['hurt', 't', 1]]), O(0.1, 'death', `The branch breaks. {t} falls right into its arms.`, [['bite', 't']])]),
       C(`{t} curls up and rolls away`, `Get under its grab.`, [O(0.5, 'good', `{t} rolls under its arms and away down the slope.`, [['funny']]), O(0.38, 'hurt', `{t} rolls into a thorn bush.`, [['hurt', 't', 1], ['funny']]), O(0.12, 'death', `It falls on {t}. It bites.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`CRACK. The rifle shot drops it instantly. {t} is saved. The echo rolls across the whole valley.`, [['next', 'dwf_gun_echo'], ['hero']]),
@@ -805,6 +816,7 @@ const events = [
       C(`Leave {t}`, `Save yourselves.`, [O(0.5, 'hurt', `{t} kicks free alone and limps after the group.`, [['hurt', 't', 2]]), O(0.5, 'death', `By the time anyone looks back, it is over.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} plays dead`, `Go limp.`, [O(0.45, 'funny', `{t} goes floppy. Confused, it loosens its grip. {t} crawls away very slowly.`, [['funny']]), O(0.43, 'hurt', `It is not fooled. {t} fights free, scratched.`, [['hurt', 't', 1]]), O(0.12, 'death', `Playing dead does not work.`, [['bite', 't']])]),
       C(`{t} grabs fistfuls of dirt and throws it`, `Right in its face.`, [O(0.5, 'good', `A face full of dirt. Its grip loosens. {t} scrambles free.`), O(0.4, 'hurt', `It barely flinches. {t} fights free, scratched.`, [['hurt', 't', 1]]), O(0.1, 'death', `The dirt does nothing.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`One shot into the ferns. The grip goes slack. {t} is free, and every creature in the forest heard it.`, [['next', 'dwf_gun_echo'], ['hero']]),
@@ -825,6 +837,7 @@ const events = [
       C(`Leave {t} to it`, `Three is too many.`, [O(0.4, 'hurt', `{t} fights free alone, badly hurt.`, [['hurt', 't', 2]]), O(0.3, 'good', `{t} gets out alone and is furious.`), O(0.3, 'death', `{t} does not make it.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} barges through the smallest one`, `Shoulder down.`, [O(0.55, 'good', `{t} flattens the smallest one and runs through the gap.`, [['hero']]), O(0.35, 'hurt', `{t} gets through with a heavy blow to the ribs.`, [['hurt', 't', 1]]), O(0.1, 'death', `It does not fall. It holds on.`, [['bite', 't']])]),
       C(`{t} hides in the fog`, `Stay still. Let the fog hide you.`, [O(0.45, 'funny', `{t} stands perfectly still in the fog. They walk straight past.`, [['funny']]), O(0.4, 'hurt', `They find {t} anyway. {t} fights free.`, [['hurt', 't', 1]]), O(0.15, 'death', `The fog does not hide {t}.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`Three shots in the fog. Three shapes fall. {t} stands shaking in the silence, and the echoes roll away down the valley.`, [['next', 'dwf_gun_echo'], ['hero']]),
@@ -903,6 +916,7 @@ const events = [
     text: [`Inside the control room: a dusty console with a big red switch marked RESCUE BEACON. A warning light reads NO POWER. A fuse slot in a grey box hangs open and empty. Through the window, the generator shed. Outside, fists are already hammering on the door.`],
     scene: { bg: 'ranger', light: 'night', z: 3 }, cast: ['t?=@infected', 'a', 'b?'], say: [['a', `"Power. We need power. Now."`], ['b', `"Fuse goes in the box. Or fuel in the generator. Either one."`, 'Engineer']],
     choices: [
+      C(`Look for Wade`, `Where did he go?`, [O(1, 'bad', `Wade is already at the beacon, the fuse in his hand. He powers it up, then locks the door to the helipad behind him. "Sorry. One seat."`, [['flag', 'betrayed']])], { req: { flags: ['wade_deal'] } }),
       C(`Fit the beacon fuse`, `Slot the spare fuse into the grey box.`, [O(1, 'good', `The fuse clicks home. Lights flicker on. {a} slams the red switch. Far above, the beacon begins to pulse. Within the hour: rotor blades.`, [['use', 'fuse'], ['flag', 'reached']])], { req: { items: ['fuse'] } }),
       C(`Fuel the generator`, `Run out to the shed with the jerrycan.`, [O(0.8, 'good', `A dash to the shed, a glug of petrol, a pull of the cord. The generator roars. The beacon lights up. Rescue is coming.`, [['use', 'fuel'], ['flag', 'reached']]), O(0.2, 'death', `The generator roars into life and the beacon lights. But {r} is caught outside on the way back.`, [['use', 'fuel'], ['flag', 'reached'], ['bite', 'r']])], { req: { items: ['fuel'] } }),
       C(`Hotwire the beacon from the battery bank`, `It might be possible to bypass the fuse.`, [O(0.55, 'good', `Sparks fly. The beacon light flickers, then holds. It worked!`, [['flag', 'reached']]), O(0.45, 'hurt', `A shower of sparks throws {r} across the room. The beacon stays dead. But the radio works: "Copy, station. Sending a team at dawn."`, [['hurt', 'r', 1], ['flag', 'fire_rescue']])]),
@@ -912,7 +926,6 @@ const events = [
       C(`Barricade and hold until morning`, `Hope someone comes.`, [O(0.4, 'good', `At dawn, a rescue team arrives on foot, following the noise. Somebody was looking after all.`, [['flag', 'fire_rescue']]), O(0.6, 'bad', `Dawn comes. Nobody else does.`, [['flag', 'overrun']])]),
       C(`Tell the others about {t}'s bite`, `The helicopter crew will check everyone.`, [O(1, 'neutral', `{t} nods, and quietly steps out into the night, closing the door behind them. "Get the beacon on," they say through the glass. "Go home."`, [['kill', 't', 'stepped outside the ranger station so the infection would not reach the rescue helicopter', 'hero'], ['next', 'dwf_fin_beacon']])], { req: { infected: true }, major: true }),
       C(`Hand the bunker files to the rescue crew`, `When they arrive, they need to know where it started.`, [O(1, 'good', `The beacon is jury-rigged to life just long enough. When the helicopter lands, {a} pushes the files into the pilot's hands. Her face goes pale.`, [['flag', 'reached'], ['flag', 'gave_files']])], { req: { items: ['files'], anyItems: ['fuse', 'fuel'] } }),
-      C(`Look for Wade`, `Where did he go?`, [O(1, 'bad', `Wade is already at the beacon, the fuse in his hand. He powers it up, then locks the door to the helipad behind him. "Sorry. One seat."`, [['flag', 'betrayed']])], { req: { flags: ['wade_deal'] } }),
     ],
   }),
 
@@ -952,7 +965,17 @@ export default {
   finale: [`${A}_fin_approach`, `${A}_fin_beacon`], finaleLoc: 'station',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
   turnEvent: `${A}_turn`, timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`, turnDelay: 4,
-  items, locations, events, defaultLoot: ['bandages', 'trail_mix', 'berries', 'batteries'],
+  npcs: {
+    pemberton: { name: `Pemberton`, traitor: 0.08, loyal: 0.6, hair: '#9b9aa3', hat: 'wide', hatC: '#8a7a4a', shirt: '#8a7a4a', legs: '#5c4b3b' },
+    wade: { name: `Wade`, traitor: 0.45, loyal: 0.25, skin: '#dc9c6e', hair: '#3b2417', hat: 'cap', hatC: '#f77f00', shirt: '#5b6b2f', legs: '#3d4f22', beard: '#3b2417' },
+    hazel: { name: `Hazel`, traitor: 0.06, loyal: 0.7, skin: '#f8cba6', hair: '#d9d9e3', style: 'long', shirt: '#3a7d44', legs: '#5c4b3b' },
+    dale: { name: `Ranger Dale`, traitor: 0.05, loyal: 0.75, skin: '#905631', hair: '#1c1b20', hat: 'wide', hatC: '#7f5539', shirt: '#6b705c', legs: '#4a4e3a' },
+    camper: { name: `the camper`, traitor: 0.25, loyal: 0.35, hair: '#e8c35a', shirt: '#c0392b', legs: '#2b2d42' },
+    hiker: { name: `the hiker`, traitor: 0.2, loyal: 0.4, skin: '#734125', hair: '#1c1b20', shirt: '#2e5fa8', legs: '#5c4b3b' },
+    joan: { name: `Joan`, traitor: 0.04, loyal: 0.7, skin: '#f8cba6', hair: '#ecebf2', style: 'bun', shirt: '#7d4cc9', legs: '#2b2d42' },
+    rambler: { name: `the rambler`, traitor: 0.1, loyal: 0.5, skin: '#eeb48b', hair: '#9b9aa3', hat: 'wide', hatC: '#7d4cc9', shirt: '#7d4cc9', legs: '#2b2d42' },
+  },
+  items, locations, events: [...events, ...companionEvents(A)], defaultLoot: ['bandages', 'trail_mix', 'berries', 'batteries'],
   travelText: [`{loc} is behind {team} now. Three ways lead on toward the ranger station. {clock} until the forest is overrun.`, `Time to leave {loc}. Which way now? The horde reaches this valley in {clock}.`],
   travelSay: [['a', [`"Which way? Quickly."`, `"Pick a path. We cannot stay."`, `"East. Which way is east?"`]]],
   travelOutcomes: T,

@@ -43,7 +43,7 @@ export function newGame(adv, characters, seed, { replay = null, useReplay = true
     inv: [], flags: {}, npcs: [], loc: adv.zones[0][0], zone: 0, zoneStages: 0, zoneQuota: adv.zoneQuota ? adv.zoneQuota[0][0] : 3,
     clock: adv.clock.start, seen: [], pending: [], cur: null, last: null, lastCat: null, lastEm: null, recentDeaths: [],
     log: { decisions: [], discoveries: [], itemsUsed: [], funny: [], heroic: [], deaths: [], locations: [adv.zones[0][0]] },
-    finished: false, ending: null, phase: 'normal', rw: {}, started: Date.now(),
+    finished: false, ending: null, phase: 'normal', rw: {}, started: Date.now(), npcData: {},
   };
   if (replay && useReplay) s.rw = replayWeights(adv, replay);
   const r = rngOf(s);
@@ -73,7 +73,35 @@ function reqOK(s, adv, req) {
   if (req.infected && !al.some((c) => c.infected && !c.infected.resolved)) return false;
   if (req.minClock !== undefined && s.clock < req.minClock) return false;
   if (req.minStage && s.stage < req.minStage) return false;
+  if (req.companion && !companionsFor(s, adv, req).length) return false;
+  if (req.npcIs) { const d = s.npcData?.[req.npcIs[0]]; if (!s.npcs.includes(req.npcIs[0]) || !d || !arr(req.npcIs[1]).includes(d.loyalty)) return false; }
   return true;
+}
+
+// ---------- companions (NPCs who travel with the group) ----------
+export function companionsFor(s, adv, req = {}) {
+  const want = req.companion === true || req.companion === undefined ? null : arr(req.companion);
+  return (s.npcs || []).filter((id) => {
+    const look = adv.npcs?.[id]; const d = s.npcData?.[id];
+    if (!look || !d) return false;
+    if (want && !want.includes(d.loyalty)) return false;
+    if (req.companionHuman && look.kind) return false;
+    if (req.joinedFor && s.stage - d.joined < req.joinedFor) return false;
+    return true;
+  });
+}
+function rollLoyalty(s, adv, id) {
+  const look = adv.npcs?.[id] || {};
+  const r = rngOf(s).next();
+  const t = look.kind ? 0 : look.traitor ?? 0.15;
+  const l = look.loyal ?? 0.5;
+  return r < t ? 'traitor' : r < t + l ? 'loyal' : 'ordinary';
+}
+export function npcName(adv, id) { return adv.npcs?.[id]?.name || id; }
+function filterLoyalty(s, os, npcId) {
+  if (!os.some((o) => o.loyalty)) return os;
+  const L = s.npcData?.[npcId]?.loyalty || 'ordinary';
+  return os.filter((o) => !o.loyalty || arr(o.loyalty).includes(L));
 }
 
 function castable(s, e) {
@@ -199,7 +227,10 @@ function renderEvent(s, adv, e, cast) {
     }
   }
   for (const id of Object.values(cast)) { const c = charById(s, id); if (c) c.involve++; }
-  const ctx = { cast };
+  let npcId = null;
+  const usesNpc = e.companion || e.choices.some((c) => c.req?.companion || c.o.some((o) => o.loyalty));
+  if (usesNpc) { const req = e.req?.companion ? e.req : (e.choices.find((c) => c.req?.companion)?.req || {}); const pool = companionsFor(s, adv, req); if (pool.length) npcId = r.pick(pool); }
+  const ctx = { cast, npc: npcId ? npcName(adv, npcId) : undefined };
   const text = fill(s, adv, e.text, ctx);
   const say = [];
   for (const line of e.say || []) {
@@ -243,13 +274,15 @@ function renderEvent(s, adv, e, cast) {
   const choices = ci.map((i) => {
     const c = e.choices[i];
     const os = effectiveOutcomes(s, adv, c.o, e);
-    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : riskSummary(os), special: !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected)) };
+    const trust = c.o.some((o) => o.loyalty);
+    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : riskSummary(os), special: !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion)) };
   });
   const loc = adv.locations[s.loc];
   const sc = e.scene || {};
   s.cur = {
+    npc: npcId,
     id: e.id, cat: e.cat, title: fill(s, adv, e.title || loc?.name || '', ctx), cast, text, say, react, choices,
-    scene: { bg: sc.bg || loc?.scene || 'street', z: sc.z ?? (e.cat === 'emergency' ? 2 : 0), light: sc.light || loc?.light || null, props: sc.props || null, cast: Object.values(cast).filter((id) => charById(s, id)?.alive) },
+    scene: { bg: sc.bg || loc?.scene || 'street', z: sc.z ?? (e.cat === 'emergency' ? 2 : 0), light: sc.light || loc?.light || null, props: sc.props || null, cast: Object.values(cast).filter((id) => charById(s, id)?.alive), npcs: [...new Set([...(e.npc || []), ...s.npcs])].filter((id) => adv.npcs?.[id]).slice(0, 3).map((id) => ({ id, ...adv.npcs[id] })) },
     travel: e.cat === 'travel' ? e._travel : null,
   };
 }
@@ -424,7 +457,11 @@ function applyFx(s, adv, fx, ctx) {
       case 'later': s.pending.push({ id: a1, cast: { ...ctx.cast } }); break;
       case 'flag': s.flags[a1] = a2 === undefined ? true : a2; break;
       case 'unflag': delete s.flags[a1]; break;
-      case 'npc': if (!s.npcs.includes(a1)) s.npcs.push(a1); s.flags['npc_' + a1] = true; break;
+      case 'npc': if (!s.npcs.includes(a1)) { s.npcs.push(a1); s.npcData ||= {}; if (!s.npcData[a1]) s.npcData[a1] = { loyalty: rollLoyalty(s, adv, a1), joined: s.stage }; else s.npcData[a1].joined = s.stage; } s.flags['npc_' + a1] = true; break;
+      case 'npcleave': { const id = a1 || ctx.npcId; if (id) { s.npcs = s.npcs.filter((n) => n !== id); delete s.flags['npc_' + id]; if (s.npcData?.[id]) { s.npcData[id].left = s.stage; s.npcData[id].revealed = a2 || s.npcData[id].revealed; } } break; }
+      case 'npcsteal': { for (let k = 0; k < (a1 || 1) && s.inv.length; k++) { const it = r.pick(s.inv); ctx.lost.push(it.id); consume(s, it.id, it.qty); } break; }
+      case 'npcdie': { const id = ctx.npcId; if (id) { s.npcs = s.npcs.filter((n) => n !== id); delete s.flags['npc_' + id]; if (s.npcData?.[id]) { s.npcData[id].died = s.stage; s.npcData[id].cause = a1; } s.log.heroic.push({ stage: s.stage, text: `${npcName(adv, id)} ${a1}` }); } break; }
+      case 'reveal': { const id = ctx.npcId; if (id && s.npcData?.[id]) s.npcData[id].revealed = true; break; }
       case 'npcgone': s.npcs = s.npcs.filter((n) => n !== a1); delete s.flags['npc_' + a1]; break;
       case 'time': s.clock += a1; break;
       case 'move': s.loc = a1; s.zone++; s.zoneStages = -1; s.zoneQuota = s.quotas[s.zone]; s.log.locations.push(a1); break;
@@ -440,7 +477,7 @@ function applyFx(s, adv, fx, ctx) {
 }
 
 function resolveOutcome(s, adv, ev, o, label) {
-  const ctx = { cast: { ...s.cur.cast }, deaths: [], hurt: [], healed: [], gained: [], lost: [], adv, resolving: true };
+  const ctx = { cast: { ...s.cur.cast }, deaths: [], hurt: [], healed: [], gained: [], lost: [], adv, resolving: true, npcId: s.cur.npc, npc: s.cur.npc ? npcName(adv, s.cur.npc) : undefined };
   applyFx(s, adv, o.fx, ctx);
   const text = fill(s, adv, o.t, ctx);
   if (ctx.funny) s.log.funny.push({ stage: s.stage, text });
@@ -465,7 +502,7 @@ export function choose(s, adv, displayIndex) {
   if (!ch) throw new Error('Invalid choice');
   const c = ev.choices[ch.i];
   const os = effectiveOutcomes(s, adv, c.o, ev);
-  const o = rngOf(s).weighted(os, (x) => x.p);
+  const o = rngOf(s).weighted(filterLoyalty(s, os, s.cur.npc), (x) => x.p);
   return resolveOutcome(s, adv, ev, o, ch.label);
 }
 
@@ -489,7 +526,7 @@ export function useItem(s, adv, itemId) {
     s.log.itemsUsed.push({ stage: s.stage, item: itemId, name: d.name, secret: true });
     consume(s, itemId, u.consume ?? 1);
     const os = u.o ? effectiveOutcomes(s, adv, u.o, ev) : [{ p: 1, k: u.k || 'good', t: u.t, fx: u.fx }];
-    const o = rngOf(s).weighted(os, (x) => x.p);
+    const o = rngOf(s).weighted(filterLoyalty(s, os, s.cur.npc), (x) => x.p);
     resolveOutcome(s, adv, ev, o, `Used: ${d.name}`);
     return { ok: true, advanced: true };
   }
@@ -545,6 +582,10 @@ function finish(s, adv) {
   return s;
 }
 
+export function companionSummary(s, adv) {
+  return Object.entries(s.npcData || {}).map(([id, d]) => ({ id, name: npcName(adv, id), loyalty: d.loyalty, died: !!d.died, cause: d.cause || null, left: d.left != null && !d.died, stayed: s.npcs.includes(id) }));
+}
+
 export function listNames(n) {
   if (!n.length) return 'no one';
   if (n.length === 1) return n[0];
@@ -588,7 +629,7 @@ export function historyRecord(s, adv) {
     ending: s.ending, objective: s.ending?.objective, stages: s.stage,
     survivors: s.party.filter((c) => c.alive).length, deaths: s.party.filter((c) => !c.alive).length,
     decisions: s.log.decisions.map((d) => ({ stage: d.stage, choice: d.choice, major: d.major, title: d.title })),
-    events: s.seen.slice(), discoveries: s.log.discoveries, itemsUsed: s.log.itemsUsed, funny: s.log.funny, heroic: s.log.heroic, deathLog: s.log.deaths, npcs: s.npcs,
+    events: s.seen.slice(), discoveries: s.log.discoveries, itemsUsed: s.log.itemsUsed, funny: s.log.funny, heroic: s.log.heroic, deathLog: s.log.deaths, npcs: s.npcs, companions: companionSummary(s, adv),
   };
 }
 

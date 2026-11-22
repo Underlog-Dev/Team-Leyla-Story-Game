@@ -3,7 +3,7 @@ import { createStorage } from './storage.js';
 import { AVATAR_OPTIONS, TRAITS, avatarSVG, defaultAvatar, randomAvatar } from './avatar.js';
 import { makeCharacter, randomCharacter, exportLibrary, parseImport, mergeLibrary, MAX_CHARACTERS, MAX_TRAITS, cleanName } from './characters.js';
 import { ADVENTURES, advById } from './adventures.js';
-import { newGame, choose, useItem, findItemUse, formatClock, historyRecord, updateReplay, statsFrom, hpLabel, MAX_HP, listNames } from './engine.js';
+import { newGame, choose, useItem, findItemUse, formatClock, historyRecord, updateReplay, statsFrom, hpLabel, MAX_HP, listNames, companionSummary, npcName } from './engine.js';
 import { makeSeed, cleanSeed } from './rng.js';
 import { sceneSVG } from './scenes.js';
 import { iconSVG } from './icons.js';
@@ -180,6 +180,7 @@ const SCREENS = {
       <div class="roster">${party.map((c) => `<div class="mini ${c.alive ? '' : 'dead'} ${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? 'infected' : ''}" title="${h(c.name)}: ${c.alive ? hpLabel(c.hp) : 'Dead'}">
         <div class="pic">${avatarSVG(c.avatar, { size: 38 })}${c.alive ? '' : '<div class="xmark">✕</div>'}</div>
         <span class="nm">${h(c.name)}</span><span class="hp">${c.alive ? '♥'.repeat(c.hp) + '<i>' + '♥'.repeat(MAX_HP - c.hp) + '</i>' : '0/3'}</span></div>`).join('')}</div>
+      ${g.npcs.length ? `<div class="companions">With you: ${g.npcs.map((id) => `<b>${h(npcName(a, id))}</b>`).join(', ')}</div>` : ''}
       <div class="scene-wrap">${sceneSVG(cur.scene, castChars, { stage: g.stage })}<div class="scene-title">${h(cur.title)}</div></div>
       <div class="story">
         ${last ? `<div class="outcome panel ${last.deaths.length ? 'bad' : last.kind === 'hurt' || last.kind === 'danger' || last.kind === 'infect' ? 'warn' : 'ok'}">
@@ -215,6 +216,7 @@ const SCREENS = {
         <div class="stat r"><b>${dd.length}</b><span>Deaths</span></div>
       </div>
       <div class="panel"><div class="lbl">THE TEAM</div><div class="end-roster">${g.party.map((c) => `<div class="end-char ${c.alive ? '' : 'dead'}"><div class="pic">${avatarSVG(c.avatar, { size: 56 })}${c.alive ? '' : '<div class="xmark">✕</div>'}</div><b>${h(c.name)}</b><span>${c.alive ? (c.infected && c.infected.resolved !== 'cured' ? 'Survived… infected' : hpLabel(c.hp)) : h(c.cause)}</span></div>`).join('')}</div></div>
+      ${companionSummary(g, a).length ? `<div class="panel"><div class="lbl">COMPANIONS — THE TRUTH</div>${companionSummary(g, a).map((c) => `<div class="comp-row"><b>${h(c.name)}</b> <span class="chip ${c.loyalty === 'loyal' ? 'g' : c.loyalty === 'traitor' ? 'r' : ''}">${c.loyalty === 'loyal' ? '✔ Loyal' : c.loyalty === 'traitor' ? '☠ Traitor' : 'Ordinary'}</span> <small>${c.died ? h(c.cause || 'died') : c.stayed ? 'stayed to the end' : c.loyalty === 'traitor' ? 'betrayed the group' : 'went their own way'}</small></div>`).join('')}</div>` : ''}
       ${list('MAJOR DECISIONS', majors, (d) => `<b>Stage ${d.stage}:</b> ${h(d.choice)}`)}
       ${list('HEROIC MOMENTS', g.log.heroic.slice(0, 6), (d) => h(d.text))}
       ${list('FUNNY MOMENTS', g.log.funny.slice(0, 6), (d) => h(d.text))}

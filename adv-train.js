@@ -1,5 +1,5 @@
 // ADVENTURE 1: LAST TRAIN OUT — zombie-infested city, reach Stonebridge Station.
-import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES } from './kit.js';
+import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue } from './kit.js';
 
 const A = 'lto';
 const E = (id, o) => ({ id: `${A}_${id}`, ...o });
@@ -166,6 +166,7 @@ const events = [
     ],
   }),
   E('dp_mechanic', {
+    npc: ['gary'],
     cat: 'interaction', loc: 'depot', title: `The Mechanic`,
     text: [`A man in oily overalls is sitting on an upturned crate, eating a sandwich as though nothing is wrong. His name badge says GARY. "Afternoon," he says. "Train, is it? Good luck."`],
     cast: ['a', 'b?'], say: [['a', `"Gary, the world is ending."`], ['b', `"Can I have half of that sandwich?"`, 'Foodie']],
@@ -204,6 +205,7 @@ const events = [
     ],
   }),
   E('hs_marta', {
+    npc: ['marta'],
     cat: 'rescue', loc: 'hospital', title: `Nurse Marta`,
     text: [`In a supply cupboard, a nurse has barricaded herself in with a mop and a fire extinguisher. Her badge says MARTA. "Are any of you bitten?" she demands. "Show me your arms. All of you."`],
     cast: ['a', 'b?'], say: [['a', `"Nobody is bitten. We are heading for the train. Come with us."`], ['b', `"Can I just say: you are terrifying, and I love that."`, 'Funny']],
@@ -231,6 +233,7 @@ const events = [
     ],
   }),
   E('pd_cells', {
+    npc: ['vince'],
     cat: 'moral', loc: 'police', title: `The Holding Cells`,
     text: [`A man is locked in cell three. He is unshaven, polite, and very keen to leave. "Name is Vince," he says. "Bit of a misunderstanding about a telly. Let me out and I will show you a way to the station nobody knows."`],
     cast: ['a', 'b?'], say: [['b', `"He has shifty eyebrows. I do not trust the eyebrows."`, 'Sarcastic'], ['b', `"Everyone deserves a second chance."`, 'Kind']],
@@ -285,6 +288,7 @@ const events = [
     ],
   }),
   E('wh_cage', {
+    npc: ['hoarder', 'hoarder'],
     cat: 'moral', loc: 'warehouse', title: `The Hoarders`,
     text: [`A loading cage is stuffed with supplies: water, tins, medicine. Three survivors guard it with cricket bats. Their leader, a woman in a hi-vis jacket, eyes {team}. "We do not share. But we trade."`],
     cast: ['a', 'b?'], say: [['b', `"They have a whole box of first aid kits. A whole box."`, 'Medic'], ['a', `"We do not want trouble."`, 'Leader']],
@@ -300,6 +304,7 @@ const events = [
 
   // ---------------- MARLOW TOWER ----------------
   E('tw_community', {
+    npc: ['bayo'],
     cat: 'moral', loc: 'tower', title: `The Fourteenth Floor`, major: true,
     text: [`On the fourteenth floor of Marlow Tower, a community has barricaded the stairs with furniture. They have rooftop gardens, rainwater tanks and a vegetable patch in a bathtub. Their leader, Pastor Bayo, smiles. "You are welcome to stay. Forever, if you like."`],
     cast: ['a', 'b?'], say: [['b', `"They have tomatoes. Real tomatoes."`, 'Foodie'], ['b', `"This is a trap. Nobody is this nice."`, 'Sarcastic'], ['a', `"It is safe here. Really safe."`]],
@@ -382,6 +387,7 @@ const events = [
 
   // ---------------- CANAL ----------------
   E('cn_boat', {
+    npc: ['dot'],
     cat: 'exploration', loc: 'canal', title: `Bessie`,
     text: [`A painted narrowboat named Bessie is moored on the towpath. Flowers in pots, a cat flap, smoke from the chimney. An old woman in a captain's hat is sitting on the roof with a shotgun across her knees. "I see you," she says.`],
     cast: ['a', 'b?'], say: [['a', `"We are not here to cause trouble, madam."`], ['b', `"I want to be her when I grow up."`, 'Funny']],
@@ -448,6 +454,7 @@ const events = [
     ],
   }),
   E('ry_signal', {
+    npc: ['signalman'],
     cat: 'moral', loc: 'railyard', title: `The Signalman`,
     text: [`In the signal box, a railway signalman is pulling levers like his life depends on it. "If I do not switch the points, the evacuation train goes down the wrong line," he pants. "But they are coming up the stairs."`],
     scene: { bg: 'railyard', z: 2 }, cast: ['a', 'b?'], say: [['b', `"We cannot leave him. If that train goes wrong, nobody gets out."`, 'Kind'], ['a', `"How long do you need?"`]],
@@ -474,6 +481,7 @@ const events = [
     ],
   }),
   E('cp_soldier', {
+    npc: ['hollis'],
     cat: 'rescue', loc: 'checkpoint', title: `Private Hollis`,
     text: [`A young soldier is pinned under the overturned truck, conscious and very pale. "Private Hollis," he gasps. "Please. I just need help getting this off my leg."`],
     cast: ['a', 'b?:Medic'], say: [['b', `"His leg is broken. If we lift it, I can splint it."`, 'Medic'], ['a', `"Hang on, Hollis. We have got you."`]],
@@ -607,6 +615,7 @@ const events = [
 
   // ---------------- ANYWHERE: RESCUES & MORAL ----------------
   E('any_dog', {
+    npc: ['biscuit'],
     cat: 'rescue', loc: '*', title: `The Dog in the Car`,
     text: [`A scruffy terrier is trapped in a parked car, barking itself hoarse. Its collar tag says BISCUIT. The noise is drawing attention: figures are beginning to appear at the end of the road.`],
     scene: { z: 2 }, cast: ['a', 'b?'], say: [['b', `"We are taking the dog. This is not a discussion."`, 'Kind'], ['b', `"I would die for Biscuit. I have known Biscuit for four seconds."`, 'Funny'], ['a', `"That barking is going to bring every infected in the city."`]],
@@ -620,6 +629,7 @@ const events = [
     ],
   }),
   E('any_vince_meet', {
+    npc: ['vince'],
     cat: 'interaction', loc: '*', req: { not: ['npc_vince', 'freed_vince'] }, title: `A Man with a Plan`,
     text: [`A man in a stolen-looking leather jacket steps out of a doorway, hands raised. "Easy, easy. Name is Vince. I know a way to Stonebridge nobody else knows. I just need a group to travel with. Safety in numbers, yeah?"`],
     cast: ['a', 'b?'], say: [['b', `"His watch is still got the price tag on."`, 'Intelligent'], ['b', `"I like him. He has nice teeth."`, 'Funny']],
@@ -632,7 +642,8 @@ const events = [
     ],
   }),
   E('vince_twist', {
-    cat: 'interaction', loc: '*', req: { flags: ['npc_vince'] }, stage: [10, 40], title: `Vince's Offer`, major: true,
+    npc: ['vince'],
+    cat: 'interaction', loc: '*', req: { flags: ['npc_vince'], npcIs: ['vince', 'traitor'] }, stage: [10, 40], title: `Vince's Offer`, major: true,
     text: [`Vince pulls {a} aside, voice low. "Look. The train only takes so many. I heard soldiers say they are turning people away. If we ditch the others, you and me get seats for sure."`],
     cast: ['a', 'b?'], say: [['a', `"Vince, are you serious?"`]],
     choices: [
@@ -644,6 +655,7 @@ const events = [
     ],
   }),
   E('any_trapped', {
+    npc: ['higgins'],
     cat: 'rescue', loc: '*', req: { not: ['npc_higgins'] }, title: `Mr Higgins`,
     text: [`"Up here! Help!" An elderly man is waving from a first-floor balcony. The stairwell below him is full of infected. "Name's Higgins! I know these streets like the back of my hand! Get me down and I will show you the way!"`],
     scene: { z: 2 }, cast: ['a', 'b?'], say: [['b', `"He looks like my grandad. We are helping him."`, 'Kind'], ['b', `"He looks like he could fight a bear. We are helping him."`, 'Funny']],
@@ -657,6 +669,7 @@ const events = [
     ],
   }),
   E('higgins_shortcut', {
+    npc: ['higgins'],
     cat: 'interaction', loc: '*', req: { flags: ['npc_higgins'] }, title: `Higgins Knows a Way`,
     text: [`Mr Higgins stops, sniffs the air, and taps his nose. "Smell that? Bakery. Bakery means the old Granary Passage. Nobody knows about it but me and the rats."`],
     cast: ['a'], say: [['a', `"Mr Higgins, you are a legend."`]],
@@ -669,6 +682,7 @@ const events = [
     ],
   }),
   E('biscuit_warns', {
+    npc: ['biscuit'],
     cat: 'interaction', loc: '*', req: { flags: ['npc_biscuit'] }, title: `Biscuit Growls`,
     text: [`Biscuit stops dead. His hackles rise. A low growl rumbles in his chest. He is staring at a dark doorway ahead.`],
     scene: { z: 1 }, cast: ['a', 'b?'], say: [['a', `"Good boy. What do you see?"`], ['b', `"I trust Biscuit with my life. Literally."`, 'Funny']],
@@ -682,6 +696,7 @@ const events = [
     ],
   }),
   E('marta_patch', {
+    npc: ['marta'],
     cat: 'interaction', loc: '*', req: { flags: ['npc_marta'], injured: true }, title: `Marta's Clinic`,
     text: [`Marta stops the group in a quiet shop doorway. "Right. Everyone who is bleeding, sit down. Everyone who is not, keep watch. No arguments."`],
     cast: ['a'], say: [['a', `"Yes, Marta."`]],
@@ -694,6 +709,7 @@ const events = [
     ],
   }),
   E('any_injured_stranger', {
+    npc: ['stranger'],
     cat: 'moral', loc: '*', title: `The Bitten Stranger`, major: true,
     text: [`A woman sits against a wall, clutching her forearm. Blood seeps through her fingers. "It is just a cut," she says. "Please. I just need a bandage. Please." Her eyes are already starting to cloud.`],
     cast: ['a', 'b?'], say: [['b', `"That is a bite. That is definitely a bite."`, 'Intelligent'], ['b', `"We cannot just leave her."`, 'Kind']],
@@ -847,6 +863,7 @@ const events = [
       C(`Run and leave {t}`, `Save yourselves.`, [O(0.5, 'hurt', `{t} escapes alone, hurt, and catches up later, furious and silent.`, [['hurt', 't', 1]]), O(0.25, 'good', `{t} escapes on their own and catches up. Nobody can look them in the eye.`), O(0.25, 'death', `{t} is not fast enough. The others hear it happen.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} grabs the nearest thing and swings`, `A bin lid, a bottle, anything.`, [O(0.55, 'good', `{t} swings a bin lid like a shield and a weapon at once. It goes down.`, [['hero']]), O(0.35, 'hurt', `The swing connects, but not before it scratches {t}.`, [['hurt', 't', 1]]), O(0.1, 'death', `The swing misses. It does not.`, [['bite', 't']])]),
       C(`{t} hides behind a car`, `Break line of sight.`, [O(0.55, 'good', `{t} dives behind a car and stays absolutely still. It loses interest.`), O(0.35, 'hurt', `It finds {t} and swipes before they scramble away.`, [['hurt', 't', 1]]), O(0.1, 'death', `It finds {t}. There is nowhere left to go.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`BANG. {t} is saved, the infected drops. But the gunshot echoes off every building for streets around.`, [['next', 'lto_gun_echo'], ['hero']]),
@@ -867,6 +884,7 @@ const events = [
       C(`Leave {t} and run`, `Save yourselves.`, [O(0.5, 'hurt', `{t} gets free alone and limps after the group, badly hurt.`, [['hurt', 't', 2]]), O(0.5, 'death', `By the time anyone looks back, it is too late for {t}.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} plays dead`, `Go limp. Maybe it loses interest.`, [O(0.45, 'funny', `{t} goes completely floppy. Confused, it lets go to grab something more lively. {t} crawls away.`, [['funny']]), O(0.43, 'hurt', `It does not lose interest. {t} has to fight free, badly scratched.`, [['hurt', 't', 1]]), O(0.12, 'death', `Playing dead does not work. It bites.`, [['bite', 't']])]),
       C(`{t} grabs the fence and holds on`, `Brace and pull back.`, [O(0.55, 'good', `{t} hauls against the fence until the grip slips.`), O(0.35, 'hurt', `{t} gets free with deep scratches down one shin.`, [['hurt', 't', 1]]), O(0.1, 'death', `The grip does not slip. Something bites through {t}'s jeans.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`Two shots through the gap. The hands go limp. {t} is free, but the shots ring out across the city.`, [['next', 'lto_gun_echo'], ['hero']]),
@@ -887,6 +905,7 @@ const events = [
       C(`Leave {t} to it`, `Three is too many.`, [O(0.4, 'hurt', `{t} fights free alone, badly hurt.`, [['hurt', 't', 2]]), O(0.3, 'good', `{t} gets out on their own and catches up, very angry.`), O(0.3, 'death', `{t} does not make it.`, [['bite', 't']])], { req: { minAlive: 2 }, major: true }),
       C(`{t} barges through the weakest one`, `Shoulder down and charge.`, [O(0.55, 'good', `{t} hits the smallest one like a rugby player. It goes flying. {t} is through.`, [['hero']]), O(0.35, 'hurt', `{t} gets through but takes a heavy hit on the way.`, [['hurt', 't', 1]]), O(0.1, 'death', `It does not go flying. It holds on, and bites.`, [['bite', 't']])]),
       C(`{t} stays perfectly still`, `Maybe they cannot see well.`, [O(0.45, 'funny', `{t} pretends to be a statue. Incredibly, they walk right past.`, [['funny']]), O(0.4, 'hurt', `It does not work. {t} has to fight free.`, [['hurt', 't', 1]]), O(0.15, 'death', `Statues do not get bitten. {t} does.`, [['bite', 't']])]),
+      companionRescue,
     ],
     uses: {
       gun: U(`Three shots. Three down. {t} stands in the silence, shaking. Then the echoes start.`, [['next', 'lto_gun_echo'], ['hero']]),
@@ -968,12 +987,12 @@ const events = [
     text: [`Inside. Platform Three. The train is packed, its doors still open. A medic with a scanner is checking everyone who boards for bites. A sergeant is shouting: "Two minutes! Two minutes!"`],
     scene: { bg: 'platform', light: 'night' }, cast: ['t?=@infected', 'a', 'b?'], say: [['a', `"We made it. We actually made it."`], ['b', `"Do not say that yet. Not until the doors close."`, 'Practical']],
     choices: [
+      C(`Look for Vince`, `He disappeared in the crowd.`, [O(1, 'bad', `Vince is already aboard. He has sold the group's seats to a man in a suit. The doors close with {team} outside.`, [['flag', 'betrayed']])], { req: { flags: ['vince_deal'] } }),
       C(`Board the train together`, `Everyone, now, through the scanner.`, [O(1, 'good', `The scanner beeps green, again and again. The doors hiss shut. The train begins to move.`, [['flag', 'reached']])]),
       C(`Help a family with a pram board first`, `A small kindness, even now.`, [O(0.8, 'good', `{a} lifts the pram aboard. The mother cries. Then {team} squeezes on as the doors close.`, [['flag', 'reached'], ['hero']]), O(0.2, 'hurt', `The doors start closing. {r} jams an arm in them to keep them open. Bruised, but everyone is aboard.`, [['flag', 'reached'], ['hurt', 'r', 1], ['hero']])]),
       C(`Hand the research drive to the medic`, `Dr Okafor's work, delivered at last.`, [O(1, 'good', `The medic reads the label and goes pale. "Sergeant! Get Command on the line. Now." {Team} is ushered into a carriage with an armed guard.`, [['flag', 'reached'], ['flag', 'gave_research']])], { req: { items: ['research'] } }),
       C(`Tell the medic about {t}'s bite`, `Honesty, even if it costs everything.`, [O(1, 'neutral', `The medic's face falls. Gently, firmly, {t} is led away to a separate carriage under guard. "We will do what we can." The others board.`, [['flag', 'reached'], ['flag', 'reported_infection'], ['kill', 't', 'was taken into quarantine at Stonebridge']])], { req: { infected: true }, major: true }),
       C(`Hold the doors for the people still running`, `Stragglers are still coming down the platform.`, [O(0.6, 'good', `{a} holds the doors. Six more people make it aboard. Then the train pulls away.`, [['flag', 'reached'], ['hero']]), O(0.4, 'death', `{a} holds the doors as the infected pour onto the platform. The train has to leave. {a} pushes the last runner aboard and stays behind.`, [['kill', 'a', 'held the train doors for strangers and was left behind on the platform', 'hero'], ['flag', 'reached']])], { major: true }),
-      C(`Look for Vince`, `He disappeared in the crowd.`, [O(1, 'bad', `Vince is already aboard. He has sold the group's seats to a man in a suit. The doors close with {team} outside.`, [['flag', 'betrayed']])], { req: { flags: ['vince_deal'] } }),
       C(`Thank the soldiers on the way in`, `They held the station for everyone.`, [O(1, 'good', `A tired sergeant shakes {a}'s hand. "You made it. Now get on." The doors close behind {team}.`, [['flag', 'reached']])]),
       C(`Find the last carriage, away from the crowd`, `Somewhere quieter to breathe.`, [O(1, 'good', `The last carriage is half empty. {Team} collapses into the seats as the train pulls out.`, [['flag', 'reached']])]),
     ],
@@ -1019,7 +1038,20 @@ export default {
   finale: [`${A}_fin_gates`, `${A}_fin_platform`], finaleLoc: 'station',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
   turnEvent: `${A}_turn`, timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`, turnDelay: 4,
-  items, locations, events: evs, defaultLoot: ['bandages', 'tinned_food', 'energy_drink', 'batteries'],
+  npcs: {
+    gary: { name: `Gary`, traitor: 0, loyal: 0, hair: '#5e5e66', hat: 'cap', hatC: '#2e5fa8', shirt: '#2e5fa8', legs: '#2e5fa8' },
+    marta: { name: `Marta`, traitor: 0.06, loyal: 0.75, skin: '#c98552', hair: '#1c1b20', style: 'bun', shirt: '#3a86b4', legs: '#3a86b4' },
+    vince: { name: `Vince`, traitor: 0.45, loyal: 0.3, hair: '#1c1b20', shirt: '#1f1f24', legs: '#3d405b', extra: 'coat' },
+    hoarder: { name: `the hoarder`, traitor: 0.3, loyal: 0.3, skin: '#f8cba6', hair: '#8f3b1b', shirt: '#f2c230', legs: '#2b2d42', extra: 'hivis' },
+    bayo: { name: `Pastor Bayo`, traitor: 0.05, loyal: 0.7, skin: '#58311c', style: 'bald', shirt: '#6a4c93', legs: '#2b2d42', extra: 'tie' },
+    dot: { name: `Dot`, traitor: 0.05, loyal: 0.6, skin: '#f8cba6', hair: '#d9d9e3', hat: 'captain', shirt: '#f2c230', legs: '#2b2d42' },
+    signalman: { name: `the signalman`, traitor: 0.1, loyal: 0.5, hair: '#3b2417', hat: 'cap', hatC: '#f77f00', shirt: '#f77f00', legs: '#2b2d42', extra: 'hivis' },
+    hollis: { name: `Private Hollis`, traitor: 0.08, loyal: 0.7, skin: '#ad6d3e', hat: 'helmet', hatC: '#556b2f', shirt: '#556b2f', legs: '#3d4f22' },
+    higgins: { name: `Mr Higgins`, traitor: 0.08, loyal: 0.65, skin: '#f8cba6', hair: '#ecebf2', shirt: '#7f5539', legs: '#5c4b3b', beard: '#ecebf2' },
+    stranger: { name: `the stranger`, traitor: 0.2, loyal: 0.4, skin: '#eeb48b', hair: '#6b3e1f', style: 'long', shirt: '#9d0208', legs: '#2b2d42' },
+    biscuit: { name: `Biscuit`, traitor: 0, loyal: 0.8, kind: 'dog', coat: '#c8a26b' },
+  },
+  items, locations, events: [...evs, ...companionEvents(A)], defaultLoot: ['bandages', 'tinned_food', 'energy_drink', 'batteries'],
   travelText: [`{loc} is behind {team} now. Three routes lead on toward Stonebridge. The clock is ticking: {clock} until the train leaves.`, `Time to move on from {loc}. Which way now? {clock} left on the clock.`],
   travelSay: [['a', [`"Which way? Quickly."`, `"We cannot stay here. Pick a route."`, `"Every minute counts. Let us choose."`]]],
   travelOutcomes: T,
