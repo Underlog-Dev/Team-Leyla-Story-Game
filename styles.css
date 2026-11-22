@@ -277,3 +277,10 @@ input:focus, textarea:focus { outline: 3px solid var(--yellow); }
 .pickable { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
 .pickable .char-card { padding: 8px 4px; }
 .pickable .px-avatar { width: 56px; height: 56px; }
+
+/* install help */
+.btn.install { width: 100%; background: #1f3a5c; font-size: .9em; }
+.install-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.install-steps li { display: flex; align-items: center; gap: 10px; background: #15111d; border: 3px solid var(--edge); padding: 8px 10px; }
+.step-n { font-family: var(--title); font-size: 11px; background: var(--red2); color: #fff; padding: 5px 7px; border: 2px solid var(--edge); flex-shrink: 0; }
+.step-ic { font-size: 1.2em; min-width: 32px; text-align: center; font-weight: 700; flex-shrink: 0; }

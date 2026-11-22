@@ -75,6 +75,7 @@ const SCREENS = {
         <button class="btn big" data-a="go" data-to="library">☺ Character Library <small>${S.chars.length}/${MAX_CHARACTERS} survivors</small></button>
         <button class="btn big" data-a="go" data-to="history">📜 Adventure History</button>
       </div>
+      ${isInstalled() ? '' : `<div class="menu"><button class="btn install" data-a="installHelp">📲 Add the game to your Home Screen</button></div>`}
       <p class="foot">Free to play · Everything saves on this device · No accounts</p>
     </div>`;
   },
@@ -278,8 +279,19 @@ function packHTML() {
   </div></div>`;
 }
 
+function isInstalled() {
+  try { return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches; } catch { return false; }
+}
+
 // ---------------- actions ----------------
 const A = {
+  installHelp() {
+    const android = /android/i.test(navigator.userAgent);
+    const steps = android
+      ? [['⋮', 'Tap the <b>three dots</b> in the top right of Chrome.'], ['📲', 'Tap <b>Add to Home screen</b> (or <b>Install app</b>).'], ['✅', 'Tap <b>Add</b>. The zombie icon appears on your Home Screen.']]
+      : [['•••', 'Tap the <b>three dots</b> in the bottom right of Safari.'], ['⬆️', 'Tap <b>Share</b>.'], ['👇', 'Scroll down the list.'], ['➕', 'Tap <b>Add to Home Screen</b>.'], ['✅', 'Tap <b>Add</b> in the top right. Done!']];
+    modal('Add to Home Screen', `<ol class="install-steps">${steps.map(([ic, t], i) => `<li><span class="step-n">${i + 1}</span><span class="step-ic">${ic}</span><span>${t}</span></li>`).join('')}</ol><p class="note">The game then opens full screen from the zombie icon, like a normal app. Your characters are saved separately there, so use <b>Export</b> in the Character Library to bring them across.</p>`, [{ label: 'Got it', cls: 'green' }]);
+  },
   go: (d) => go(d.to),
   modalClose: () => closeModal(),
   modalBtn: (d) => { const b = S.modal.buttons[+d.i]; closeModal(); if (b.fn) b.fn(); },
