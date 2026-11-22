@@ -764,7 +764,7 @@ const events = [
   // ---------------- EMERGENCIES ----------------
   E('em_lunge', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `It Lunges!`,
-    text: [`A cabin door bangs open and an infected passenger in a bathrobe lunges straight at {t}! Its hands grab at {t}'s collar, mouth wide.`],
+    text: [`A cabin door bangs open and an infected passenger in a bathrobe lunges straight at {t}! Its hands grab at {t}'s collar, mouth wide.`, `A steward bursts out of a service hatch, tray clattering to the floor, and lunges at {t}!`, `A lift door slides open with a cheerful ping, and something inside launches itself at {t}!`],
     scene: { z: 1, light: 'alert' }, cast: ['t!', 'h?'], say: [['h', `"{t}! Watch out!"`], ['t', `"GET IT OFF ME!"`, 'Nervous']],
     choices: [
       C(`{t} shoves it back into the cabin`, `Push and slam the door.`, [O(0.6, 'good', `{t} shoves it back through the doorway and slams the door on it.`), O(0.22, 'hurt', `{t} gets it back inside, but it rakes their arm first.`, [['hurt', 't', 1]]), O(0.08, 'infect', `The door slams, but there is a scratch on {t}'s hand that will not stop stinging.`, [['hurt', 't', 1], ['infect', 't']]), O(0.1, 'death', `It drags {t} into the cabin. The door swings shut.`, [['bite', 't']])]),
@@ -786,7 +786,7 @@ const events = [
   }),
   E('em_grab', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `Grabbed Through the Railing!`,
-    text: [`Hands shoot through the railings from the deck below and seize {t}'s ankle. {t} goes down hard, and is being dragged toward the edge.`],
+    text: [`Hands shoot through the railings from the deck below and seize {t}'s ankle. {t} goes down hard, and is being dragged toward the edge.`, `A hand reaches out from under a cabin door and grabs {t}'s ankle, yanking {t} off their feet!`, `{t} steps over a pile of deck chairs and something underneath seizes a leg!`],
     scene: { z: 2, light: 'alert' }, cast: ['t!', 'h?'], say: [['h', `"Hold on, {t}!"`], ['t', `"It has got my LEG!"`]],
     choices: [
       C(`Pull {t} back`, `Everyone heave.`, [O(0.68, 'good', `A desperate tug of war, and {t} comes free, minus a shoe.`, [['funny']]), O(0.17, 'hurt', `{t} comes free, but their leg is scraped raw on the railing.`, [['hurt', 't', 1]]), O(0.07, 'infect', `{t} comes free, but its nails broke the skin. The scratch is darkening.`, [['hurt', 't', 1], ['infect', 't']]), O(0.08, 'death', `Another one reaches up and bites {t}'s ankle.`, [['bite', 't']])], { req: { minAlive: 2 } }),
@@ -807,7 +807,7 @@ const events = [
   }),
   E('em_surround', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `Trapped in the Stairwell`,
-    text: [`{t} goes a few steps ahead into a stairwell and is suddenly trapped: infected coming up from below and down from above. {t} is pinned on the landing.`],
+    text: [`{t} goes a few steps ahead into a stairwell and is suddenly trapped: infected coming up from below and down from above. {t} is pinned on the landing.`, `{t} rounds a corner into the gift shop, and three infected shoppers turn round together.`, `The corridor lights go out. When they flicker back on, {t} is boxed in by infected on every side.`],
     scene: { z: 3, light: 'alert' }, cast: ['t!', 'h?'], say: [['h', `"{t}! Hold on!"`], ['t', `"Little help? Little help would be great?"`, 'Funny'], ['t', `"I can take them."`, 'Brave']],
     choices: [
       C(`{t} jumps the banister`, `Down to the next flight.`, [O(0.55, 'good', `{t} vaults the banister and drops a flight, landing running.`), O(0.27, 'hurt', `{t} lands badly a flight down, but clear.`, [['hurt', 't', 1]]), O(0.08, 'infect', `{t} jumps clear, but one of them got a scratch in first.`, [['hurt', 't', 1], ['infect', 't']]), O(0.1, 'death', `They catch {t} mid-jump.`, [['bite', 't']])]),
@@ -878,6 +878,7 @@ const events = [
     text: [`Lifeboat 14 swings at deck level, ready. The Aurora Star is listing badly now, rails dipping toward the black water. Infected are pouring onto the boat deck from both stairwells. This is the moment.`],
     scene: { bg: 'lifeboats', z: 4, light: 'night' }, cast: ['a', 'b?'], say: [['a', `"Everybody in! NOW!"`], ['b', `"I will cast off the ropes. Get in!"`, 'Brave'], ['b', `"Final escape sequence. Do NOT mess this up."`, 'Gamer']],
     choices: [
+      C(`Let {npc} lower the boat while you hold the deck`, `{npc} offers to work the davits.`, [{ p: 0.8, k: 'good', t: `{npc} works the levers like a sailor. The boat drops smoothly and {npc} jumps in last.`, fx: [['flag','launched']], loyalty: 'loyal'}, { p: 0.2, k: 'good', t: `The davit jams. {npc} stays on deck, cranking by hand as the infected close in, until the boat is in the water. {npc} waves once and is gone.`, fx: [['flag','launched'],['npcdie','stayed on the sinking deck to lower the lifeboat by hand']], loyalty: 'loyal'}, { p: 0.6, k: 'good', t: `{npc} fumbles the levers, but the boat drops. Everyone tumbles in.`, fx: [['flag','launched']], loyalty: 'ordinary'}, { p: 0.4, k: 'hurt', t: `{npc} drops the boat too fast. It slams into the sea and {r} is thrown against the bench.`, fx: [['flag','launched'],['hurt','r',1]], loyalty: 'ordinary'}, { p: 1, k: 'bad', t: `{npc} climbs into the boat first, releases the davits, and drops away into the dark sea. Alone. {Team} is left on the deck.`, fx: [['flag','betrayed']], loyalty: 'traitor'}], { req: { companion: true, companionHuman: true } }),
       C(`Look for Giles`, `Where is the purser?`, [O(1, 'bad', `Giles is already in Lifeboat 14 with the engine running. He casts off, alone. "Sorry. Officers first."`, [['flag', 'betrayed']])], { req: { flags: ['giles_deal'] } }),
       C(`Pile into the lifeboat and drop it`, `Everyone in, release, fall.`, [O(0.6, 'good', `A heart-stopping drop, a huge splash, and the lifeboat is in the water, away from the ship.`, [['flag', 'launched']]), O(0.3, 'hurt', `The boat drops too fast and slams into the sea. {r} is thrown against the bench.`, [['hurt', 'r', 1], ['flag', 'launched']]), O(0.1, 'death', `As the boat drops, an infected grabs {r} from the deck and pulls them back.`, [['bite', 'r'], ['flag', 'launched']])]),
       C(`Lower it properly with the winch key`, `Smooth and controlled.`, [O(1, 'good', `The davits whirr. The boat glides down to the water like an elevator. Perfect.`, [['flag', 'launched']])], { req: { items: ['winch_key'] } }),
@@ -929,11 +930,11 @@ const events = [
 ];
 
 const T = travelTables({
-  lowOk: [`A long way round through quiet passages. Nothing stirs.`, `The detour is slow but completely quiet.`],
-  medOk: [`{Team} reaches {loc} without trouble.`, `A tense walk, but everyone makes it.`],
-  highOk: [`A fast, risky dash across the ship, and it pays off.`, `{Team} covers the distance quickly.`],
-  hurt: [`On the way, the ship lurches and {r} is thrown against a bulkhead.`, `{r} slips on a wet stairwell on the way.`],
-  danger: [`Halfway there, a cabin door bursts open beside {r}!`, `On the way, something lurches out of a service door at {r}!`],
+  lowOk: [`A long way round through quiet passages. Nothing stirs.`, `The detour is slow but completely quiet.`, `Empty crew corridors, humming lights, and nobody in them.`, `The long route through the service decks takes ages, but stays silent.`, `Past a row of closed cabins. Every door stays shut.`, `Quiet stairwells all the way down. Nobody follows.`, `The ship creaks and groans, but nothing else does.`, `A slow, careful walk. The only sound is water somewhere far below.`],
+  medOk: [`{Team} reaches {loc} without trouble.`, `A tense walk, but everyone makes it.`, `Twice a cabin door rattles. Twice it holds. Then {loc}.`, `The ship lurches and everyone grabs the handrail. Then {loc}.`, `Muffled screams from a deck below, but {team} reaches {loc} safely.`, `Emergency lights flicker the whole way, but nothing jumps out.`, `A trail of abandoned suitcases leads all the way to {loc}.`, `Water sloshes underfoot. {Team} reaches {loc} soaked but whole.`],
+  highOk: [`A fast, risky dash across the ship, and it pays off.`, `{Team} covers the distance quickly.`, `Straight down the main corridor at a sprint. Nothing catches up.`, `Through the middle of the atrium, fast, and out the far side.`, `Vaulting deck chairs and sliding down banisters. Time saved.`, `Loud and reckless, but very, very quick.`, `A mad run past a crowd of infected that turn far too slowly.`, `Down three stairwells in one breathless rush.`],
+  hurt: [`On the way, the ship lurches and {r} is thrown against a bulkhead.`, `{r} slips on a wet stairwell on the way.`, `A loose fire extinguisher rolls into {r}'s ankle.`, `{r} cracks an elbow on a door frame as the ship tilts.`, `Broken glass from a shop window catches {r}'s hand.`, `{r} trips over a suitcase in the dark.`],
+  danger: [`Halfway there, a cabin door bursts open beside {r}!`, `On the way, something lurches out of a service door at {r}!`, `A lift opens with a ping. Something inside reaches for {r}!`, `A figure in a bathrobe stumbles out of a stairwell, straight at {r}!`, `Something under a pile of deck chairs grabs at {r}!`],
 });
 
 export default {
@@ -961,11 +962,11 @@ export default {
     mime: { name: `the mime`, traitor: 0.25, loyal: 0.4, skin: '#f7f7fa', style: 'bald', hat: 'cap', hatC: '#1b1b22', shirt: '#1b1b22', legs: '#1b1b22', extra: 'stripes' },
   },
   items, locations, events: [...events, ...companionEvents(A)], defaultLoot: ['bandages', 'canapes', 'lifejackets', 'batteries'],
-  travelText: [`{loc} is behind {team} now. Three ways lead aft toward the lifeboats. The ship sinks in {clock}.`, `Time to leave {loc}. Which way now? {clock} before the Aurora Star goes under.`],
+  travelText: [`{loc} is behind {team} now. Three ways lead aft toward the lifeboats. The ship sinks in {clock}.`, `Time to leave {loc}. Which way now? {clock} before the Aurora Star goes under.`, `The deck is tilting a little more. Three routes on from {loc}, and {clock} left.`, `A long groan runs through the hull. {clock} before the sea takes her. Which way?`, `Water is creeping up the stairwells. {clock} left. Pick a route from {loc}.`],
   travelSay: [['a', [`"Which way? Quickly."`, `"Pick a route. The water is rising."`, `"Aft. Lifeboats are aft. Which way is aft?"`]]],
   travelOutcomes: T,
-  restChoice: { l: `Rest and patch up first`, d: `Heal one injury, but lose time. You will choose the route after.`, o: [O(0.85, 'good', `A short rest in a locked cabin. Wounds are cleaned and bound.`, [['heal', 'injured', 1], ['time', -2]]), O(0.15, 'danger', `The rest is interrupted. Something finds {r}!`, [['em', 'r'], ['time', -1]])] },
-  scavengeChoice: { l: `Search {loc} one more time`, d: `One more look around before moving on. Costs time.`, o: [O(0.6, 'item', `One last search turns up {loot}.`, [['loot'], ['time', -1]]), O(0.4, 'neutral', `Nothing more to find.`, [['time', -1]])] },
+  restChoice: { l: `Rest and patch up first`, d: `Heal one injury, but lose time. You will choose the route after.`, o: [O(0.85, 'good', [`A short rest in a locked cabin. Wounds are cleaned and bound.`, `Ten minutes in an empty crew mess. Bandages tightened, water shared.`, `A pause in a linen cupboard, among fresh towels. Cuts are cleaned up.`, `A quiet rest in a deserted bar. Someone finds a first aid box behind the counter.`, `Everyone sits on a stairwell landing and catches their breath. Wounds are wrapped.`, `A rest in a lifejacket store. Bandages and silence.`], [['heal', 'injured', 1], ['time', -2]]), O(0.15, 'danger', [`The rest is interrupted. Something finds {r}!`, `Just as everyone sits down, the cabin door handle turns near {r}!`, `The quiet does not last. Something has followed {team} down the corridor, and it goes for {r}!`], [['em', 'r'], ['time', -1]])] },
+  scavengeChoice: { l: `Search {loc} one more time`, d: `One more look around before moving on. Costs time.`, o: [O(0.6, 'item', [`One last search turns up {loot}.`, `A final look round pays off: {loot}.`, `Under a seat cushion: {loot}.`, `Someone checks one more locker. {loot}.`, `On the way out, {r} spots {loot}.`], [['loot'], ['time', -1]]), O(0.4, 'neutral', [`Nothing more to find.`, `A second search turns up nothing but napkins.`, `Still nothing. Time to go.`, `Nothing new. Just wet carpet.`, `Every cupboard is empty now.`], [['time', -1]])] },
   quips: { ...GENERIC_QUIPS, Any: [...GENERIC_QUIPS.Any, `"I am leaving a very strongly worded review of this cruise."`, `"Remember when the worst thing about this trip was the buffet?"`] },
   deathLines: GENERIC_DEATH_LINES,
   endings: [

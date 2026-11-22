@@ -853,7 +853,7 @@ const events = [
   // ---------------- EMERGENCIES ----------------
   E('em_lunge', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `It Lunges!`,
-    text: [`An infected bursts out of nowhere and lunges at {t}! Its hands are grasping, its teeth bared, just a metre away.`],
+    text: [`An infected bursts out of nowhere and lunges at {t}! Its hands are grasping, its teeth bared, just a metre away.`, `Out of a shop doorway, an infected throws itself at {t}! Teeth bared, arms grabbing, it is already too close.`, `A figure that was slumped against a bus stop springs up and lurches straight at {t}!`],
     scene: { z: 1, light: 'alert' }, cast: ['t!', 'h?'], say: [['h', `"{t}! Watch out!"`], ['t', `"Get it off! Get it off!"`, 'Nervous']],
     choices: [
       C(`{t} shoves it away and runs`, `Push and sprint.`, [O(0.62, 'good', `{t} shoves with everything they have. It stumbles. {t} runs. Safe.`), O(0.2, 'hurt', `{t} shoves it away, but it rakes their arm with its nails.`, [['hurt', 't', 1]]), O(0.08, 'infect', `{t} gets away, but there is a scratch on their wrist that will not stop bleeding. It looks... wrong.`, [['hurt', 't', 1], ['infect', 't']]), O(0.1, 'death', `It holds on. Its teeth find {t}'s shoulder.`, [['bite', 't']])]),
@@ -874,7 +874,7 @@ const events = [
   }),
   E('em_grab', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `Grabbed!`,
-    text: [`Hands burst through a broken fence and seize {t}'s leg! {t} goes down hard, and the hands are pulling, dragging {t} toward the gap.`],
+    text: [`Hands burst through a broken fence and seize {t}'s leg! {t} goes down hard, and the hands are pulling, dragging {t} toward the gap.`, `{t} steps past a parked van and a hand shoots out from underneath, clamping round an ankle! {t} hits the pavement hard.`, `A cellar grate rattles and fingers burst through, seizing {t}'s leg and pulling!`],
     scene: { z: 2, light: 'alert' }, cast: ['t!', 'h?'], say: [['h', `"Hold on! I have got you!"`], ['t', `"It has my leg! It HAS MY LEG!"`]],
     choices: [
       C(`Pull {t} free`, `Everyone grab an arm and heave.`, [O(0.68, 'good', `A desperate tug of war, and {t} comes free, minus one trainer.`, [['funny']]), O(0.17, 'hurt', `{t} comes free, but their leg is badly scraped on the fence.`, [['hurt', 't', 1]]), O(0.07, 'infect', `{t} comes free, but its nails broke the skin. The scratch is already turning dark.`, [['hurt', 't', 1], ['infect', 't']]), O(0.08, 'death', `Another one reaches through the gap. It bites {t}'s ankle.`, [['bite', 't']])], { req: { minAlive: 2 } }),
@@ -895,7 +895,7 @@ const events = [
   }),
   E('em_surround', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `Cut Off!`,
-    text: [`{t} wanders a few metres ahead to check a side street and is suddenly surrounded: three infected, closing in from three directions. {t} is trapped against a shop window.`],
+    text: [`{t} wanders a few metres ahead to check a side street and is suddenly surrounded: three infected, closing in from three directions. {t} is trapped against a shop window.`, `{t} ducks into a side street for a shortcut and freezes: three infected step out of three doorways at once.`, `One wrong turn, and {t} is in a dead-end yard with infected closing in on every side.`],
     scene: { z: 3, light: 'alert' }, cast: ['t!', 'h?'], say: [['h', `"{t}! Hold on!"`], ['t', `"Little help? Little help would be great?"`, 'Funny'], ['t', `"I can take them. Probably. Maybe."`, 'Brave']],
     choices: [
       C(`{t} smashes through the shop window`, `Glass is better than teeth.`, [O(0.47, 'hurt', `{t} crashes through the window in a shower of glass, cut but free.`, [['hurt', 't', 1]]), O(0.08, 'infect', `{t} crashes through the glass, but one of them caught a scratch first. It burns.`, [['hurt', 't', 1], ['infect', 't']]), O(0.35, 'good', `{t} dives through the window and rolls out the back door. Movie stuff.`), O(0.1, 'death', `The window will not break. They reach {t}.`, [['bite', 't']])]),
@@ -983,10 +983,11 @@ const events = [
     },
   }),
   E('fin_platform', {
-    cat: 'finale', loc: 'station', essential: true, repeat: true, title: `Platform Three`, major: true,
+    cat: 'finale', loc: 'station', essential: true, repeat: true, title: `Platform Three`, major: true, maxCond: 3,
     text: [`Inside. Platform Three. The train is packed, its doors still open. A medic with a scanner is checking everyone who boards for bites. A sergeant is shouting: "Two minutes! Two minutes!"`],
     scene: { bg: 'platform', light: 'night' }, cast: ['t?=@infected', 'a', 'b?'], say: [['a', `"We made it. We actually made it."`], ['b', `"Do not say that yet. Not until the doors close."`, 'Practical']],
     choices: [
+      C(`Let {npc} get the seats while you hold the platform`, `{npc} offers to talk to the sergeant and secure everyone's places.`, [{ p: 0.85, k: 'good', t: `{npc} comes back waving boarding tags. "Carriage four. All of us." The doors close behind everyone.`, fx: [['flag','reached']], loyalty: 'loyal'}, { p: 0.15, k: 'good', t: `{npc} gets everyone aboard, then holds the doors for the last runner and is dragged back onto the platform. {npc} pushes them in and does not make it.`, fx: [['flag','reached'],['npcdie','held the train doors so everyone else could board']], loyalty: 'loyal'}, { p: 0.7, k: 'good', t: `{npc} argues with the sergeant for far too long, but it works. Everyone boards.`, fx: [['flag','reached']], loyalty: 'ordinary'}, { p: 0.3, k: 'hurt', t: `{npc} takes too long. The infected reach the platform before the doors close, and {r} is hurt holding them back. Everyone squeezes aboard.`, fx: [['flag','reached'],['hurt','r',1]], loyalty: 'ordinary'}, { p: 1, k: 'bad', t: `{npc} talks to the sergeant, points at {team}, and says the word "infected". The soldiers raise their rifles. {npc} boards alone and waves goodbye.`, fx: [['flag','betrayed']], loyalty: 'traitor'}], { req: { companion: true, companionHuman: true } }),
       C(`Look for Vince`, `He disappeared in the crowd.`, [O(1, 'bad', `Vince is already aboard. He has sold the group's seats to a man in a suit. The doors close with {team} outside.`, [['flag', 'betrayed']])], { req: { flags: ['vince_deal'] } }),
       C(`Board the train together`, `Everyone, now, through the scanner.`, [O(1, 'good', `The scanner beeps green, again and again. The doors hiss shut. The train begins to move.`, [['flag', 'reached']])]),
       C(`Help a family with a pram board first`, `A small kindness, even now.`, [O(0.8, 'good', `{a} lifts the pram aboard. The mother cries. Then {team} squeezes on as the doors close.`, [['flag', 'reached'], ['hero']]), O(0.2, 'hurt', `The doors start closing. {r} jams an arm in them to keep them open. Bruised, but everyone is aboard.`, [['flag', 'reached'], ['hurt', 'r', 1], ['hero']])]),
@@ -1018,11 +1019,11 @@ const events = [
 const evs = events.filter((e) => e.choices);
 
 const T = travelTables({
-  lowOk: [`A long, careful walk. Nothing goes wrong.`, `The detour is slow but completely quiet.`],
-  medOk: [`{Team} arrives at {loc} without trouble.`, `A tense journey, but everyone makes it.`],
-  highOk: [`A fast, risky dash, and it pays off. Time saved.`, `{Team} pushes hard and covers the ground quickly.`],
-  hurt: [`On the way, {r} stumbles over debris and lands badly.`, `{r} is clipped by a falling sign on the way.`],
-  danger: [`Halfway there, an infected staggers out of a doorway at {r}!`, `On the way, something lurches from between two cars at {r}!`],
+  lowOk: [`A long, careful walk. Nothing goes wrong.`, `The detour is slow but completely quiet.`, `Back streets and side roads. Not a soul, living or otherwise.`, `The long way round takes ages, but nothing stirs.`, `Garden fences, alleyways, a playground. Quiet the whole way.`, `Slow going through the backstreets, but not a single scare.`, `A cat watches {team} pass. That is the most excitement on the whole route.`, `Past rows of silent houses with their curtains drawn. Nobody follows.`],
+  medOk: [`{Team} arrives at {loc} without trouble.`, `A tense journey, but everyone makes it.`, `Twice {team} ducks behind parked cars. Twice nothing comes. Then {loc}.`, `Distant screams, a burning bus, but {team} reaches {loc} in one piece.`, `Sirens wail somewhere far off as {team} slips into {loc}.`, `The route is littered with abandoned shopping bags and shoes. Nobody looks too closely.`, `Every shadow looks like a threat. None of them are, this time.`, `A helicopter thuds overhead as {team} reaches {loc}.`],
+  highOk: [`A fast, risky dash, and it pays off. Time saved.`, `{Team} pushes hard and covers the ground quickly.`, `Straight down the middle of the road at a sprint. Nothing catches up.`, `Over car bonnets and through a shop, and out the other side in record time.`, `Breathless, sweaty, and well ahead of schedule.`, `It is reckless and loud and it works.`, `A wild run past a crowd of infected that turn too slowly to matter.`, `Jumping fences, cutting corners, and {team} is through.`],
+  hurt: [`On the way, {r} stumbles over debris and lands badly.`, `{r} is clipped by a falling sign on the way.`, `{r} slices a hand climbing over a broken wall.`, `A pothole swallows {r}'s foot. The ankle complains loudly.`, `{r} catches the edge of a car door and goes down hard.`, `Broken glass in the road gets {r} through a trainer.`],
+  danger: [`Halfway there, an infected staggers out of a doorway at {r}!`, `On the way, something lurches from between two cars at {r}!`, `A bus shelter is not empty. Something inside reaches for {r}!`, `A shop alarm goes off and a figure bursts out, straight at {r}!`, `Turning a corner, {r} walks right into one of them!`],
 });
 
 export default {
@@ -1052,11 +1053,11 @@ export default {
     biscuit: { name: `Biscuit`, traitor: 0, loyal: 0.8, kind: 'dog', coat: '#c8a26b' },
   },
   items, locations, events: [...evs, ...companionEvents(A)], defaultLoot: ['bandages', 'tinned_food', 'energy_drink', 'batteries'],
-  travelText: [`{loc} is behind {team} now. Three routes lead on toward Stonebridge. The clock is ticking: {clock} until the train leaves.`, `Time to move on from {loc}. Which way now? {clock} left on the clock.`],
+  travelText: [`{loc} is behind {team} now. Three routes lead on toward Stonebridge. The clock is ticking: {clock} until the train leaves.`, `Time to move on from {loc}. Which way now? {clock} left on the clock.`, `{Team} gathers at the edge of {loc}. Stonebridge is still miles away, and the train leaves in {clock}.`, `Smoke drifts over the rooftops. Three ways onward from {loc}, and {clock} until the last train.`, `A distant train horn sounds, just a test, hopefully. {clock} left. Which route?`],
   travelSay: [['a', [`"Which way? Quickly."`, `"We cannot stay here. Pick a route."`, `"Every minute counts. Let us choose."`]]],
   travelOutcomes: T,
-  restChoice: { l: `Rest and patch up first`, d: `Heal one injury, but lose precious time. You will choose the route after.`, o: [O(0.85, 'good', `A short, tense rest in a doorway. Wounds are cleaned and bound.`, [['heal', 'injured', 1], ['time', -2]]), O(0.15, 'danger', `The rest is interrupted. Something finds {r}!`, [['em', 'r'], ['time', -1]])] },
-  scavengeChoice: { l: `Search {loc} one more time`, d: `One more look around before moving on. Costs time.`, o: [O(0.6, 'item', `One last sweep turns up {loot}.`, [['loot'], ['time', -1]]), O(0.4, 'neutral', `Nothing more to find here.`, [['time', -1]])] },
+  restChoice: { l: `Rest and patch up first`, d: `Heal one injury, but lose precious time. You will choose the route after.`, o: [O(0.85, 'good', [`A short, tense rest in a doorway. Wounds are cleaned and bound.`, `Ten minutes in an empty launderette. Bandages tightened, water shared.`, `A pause in a bus shelter, backs to the wall. The worst cuts are cleaned up.`, `A quick stop behind a phone box. Someone finds plasters in their pocket.`, `Everyone sits on the floor of an abandoned café and gets their breath back.`, `A rest in a stairwell. Wounds are washed with bottled water and wrapped up.`], [['heal', 'injured', 1], ['time', -2]]), O(0.15, 'danger', [`The rest is interrupted. Something finds {r}!`, `Just as everyone sits down, a shape blocks the doorway near {r}!`, `The quiet does not last. Something has followed {team}, and it goes for {r}!`], [['em', 'r'], ['time', -1]])] },
+  scavengeChoice: { l: `Search {loc} one more time`, d: `One more look around before moving on. Costs time.`, o: [O(0.6, 'item', [`One last sweep turns up {loot}.`, `A final look round pays off: {loot}.`, `Second time lucky. {loot}, behind a bin.`, `Someone checks one more cupboard. {loot}.`, `On the way out, {r} spots {loot}.`], [['loot'], ['time', -1]]), O(0.4, 'neutral', [`Nothing more to find here.`, `A second search turns up nothing at all.`, `Still nothing. Time to go.`, `Not even a crumb. {Team} gives up.`, `Nothing new. Just the same mess as before.`], [['time', -1]])] },
   quips: { ...GENERIC_QUIPS, Any: [...GENERIC_QUIPS.Any, `"I keep thinking that train is going to have a buffet car."`, `"How many more streets? Is it many? It feels like many."`] },
   deathLines: GENERIC_DEATH_LINES,
   endings: [

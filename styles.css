@@ -133,6 +133,12 @@ input:focus, textarea:focus { outline: 3px solid var(--yellow); }
 .tb-mid { flex: 1; text-align: center; min-width: 0; }
 .tb-title { font-family: var(--title); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--accent); }
 .tb-sub { font-size: .75em; color: var(--yellow); margin-top: 2px; }
+.heat { font-size: .62em; color: var(--dim); display: flex; align-items: center; justify-content: center; gap: 4px; }
+.heat span { display: inline-flex; gap: 2px; }
+.heat i { width: 10px; height: 8px; background: #2a2238; border: 1px solid #000; }
+.heat i.on { background: #7fae5a; }
+.heat i.on:nth-child(3) { background: #f2c230; }
+.heat i.on:nth-child(4) { background: #e63946; }
 .roster { display: flex; gap: 6px; overflow-x: auto; padding: 6px 8px; background: #120f1a; border-bottom: 3px solid var(--edge); scrollbar-width: thin; }
 .mini { display: flex; flex-direction: column; align-items: center; min-width: 50px; max-width: 64px; font-size: 11px; }
 .mini .pic { position: relative; }
@@ -259,3 +265,15 @@ input:focus, textarea:focus { outline: 3px solid var(--yellow); }
 
 @media (min-width: 640px) { body { padding: 12px 0; } }
 @media (prefers-reduced-motion: reduce) { *, *::after { animation: none !important; transition: none !important; } }
+
+/* big teams: compact wrapping roster */
+.roster.many { flex-wrap: wrap; overflow: visible; gap: 3px 2px; padding: 4px 6px; justify-content: flex-start; }
+.roster.many .mini { min-width: 0; width: calc((100% - 22px) / 10); max-width: 46px; font-size: 9px; }
+.roster.many .mini .px-avatar { width: 100%; height: auto; aspect-ratio: 1; border-width: 2px; }
+.roster.many .mini .nm { max-width: 100%; font-size: 9px; }
+.roster.many .mini .hp { font-size: 8px; letter-spacing: 0; }
+.roster.many .xmark { font-size: 20px; }
+.alive-count { width: 100%; font-size: 11px; color: var(--yellow); padding: 0 2px 2px; }
+.pickable { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.pickable .char-card { padding: 8px 4px; }
+.pickable .px-avatar { width: 56px; height: 56px; }

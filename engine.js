@@ -140,8 +140,18 @@ function castWith(s, roles, given) {
 
 // ---------- text ----------
 function nameOf(s, id) { const c = charById(s, id); return c ? c.name : 'someone'; }
+function pickVariant(s, list) {
+  // prefer a variant not yet shown in this game
+  s.usedText ||= [];
+  const fresh = list.filter((t) => !s.usedText.includes(t.slice(0, 40)));
+  const t = rngOf(s).pick(fresh.length ? fresh : list);
+  s.usedText.push(t.slice(0, 40));
+  if (s.usedText.length > 400) s.usedText.splice(0, 100);
+  return t;
+}
+
 export function fill(s, adv, text, ctx = {}) {
-  if (Array.isArray(text)) text = rngOf(s).pick(text);
+  if (Array.isArray(text)) text = text.length > 1 ? pickVariant(s, text) : text[0];
   if (!text) return '';
   const al = alive(s);
   return String(text).replace(/\{(\w+)\}/g, (m, k) => {
@@ -169,7 +179,14 @@ export function formatClock(adv, units) {
 }
 
 // ---------- probabilities ----------
-export function dangerScale(s, adv) { return 0.8 + 0.45 * progressOf(s, adv); }
+export const MAX_HEAT = 8;
+export function dangerScale(s, adv) {
+  let f = 0.8 + 0.45 * progressOf(s, adv) + 0.09 * Math.min(MAX_HEAT, s.heat || 0);
+  if (alive(s).length === 1) f *= 0.75; // a lone survivor is harder to spot
+  return f;
+}
+// How many extra people a single accident or attack can reach in a big group
+export function spread(s) { const n = alive(s).length; return { hurt: Math.max(0, (n - 2) * 0.32), em: Math.max(0, (n - 3) * 0.15) }; }
 
 export function effectiveOutcomes(s, adv, outcomes, ev) {
   const os = outcomes.map((o) => ({ ...o }));
@@ -275,7 +292,9 @@ function renderEvent(s, adv, e, cast) {
     const c = e.choices[i];
     const os = effectiveOutcomes(s, adv, c.o, e);
     const trust = c.o.some((o) => o.loyalty);
-    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : riskSummary(os), special: !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion)) };
+    const sp = spread(s);
+    const tag = (rk) => rk.map((x) => (x.k === 'hurt' && sp.hurt >= 0.5 ? { ...x, label: x.label + ' (several)' } : x.k === 'danger' && sp.em >= 0.5 ? { ...x, label: x.label + ' (more may come)' } : x));
+    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : tag(riskSummary(os)), special: !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion)) };
   });
   const loc = adv.locations[s.loc];
   const sc = e.scene || {};
@@ -445,14 +464,33 @@ function applyFx(s, adv, fx, ctx) {
       case 'item': addItem(s, adv, a1, a2, ctx); break;
       case 'use': if (a1 === 'tag') { const it = s.inv.find((i) => (adv.items[i.id]?.tags || []).includes(a2)); if (it) { s.log.itemsUsed.push({ stage: s.stage, item: it.id, name: adv.items[it.id].name }); consume(s, it.id, 1); } } else if (hasItem(s, a1)) { s.log.itemsUsed.push({ stage: s.stage, item: a1, name: adv.items[a1].name }); consume(s, a1, a2 || 1); } break;
       case 'lose': { if (s.inv.length) { const it = r.pick(s.inv); ctx.itemName = adv.items[it.id].name; consume(s, it.id, it.qty); ctx.lost.push(it.id); } break; }
-      case 'hurt': for (const c of pickTarget(s, a1, ctx)) { c.hp -= a2 || 1; c.danger++; ctx.hurt.push(c.id); if (c.hp <= 0) die(s, c, a3 || 'succumbed to their injuries', ctx); } break;
+      case 'hurt': {
+        const targets = pickTarget(s, a1, ctx);
+        if (a1 === 'r' && targets.length) {
+          const x = spread(s).hurt; let extra = Math.floor(x) + (r.chance(x % 1) ? 1 : 0);
+          const others = r.shuffle(alive(s).filter((c) => c !== targets[0]));
+          while (extra-- > 0 && others.length) { const o = others.pop(); targets.push(o); ctx.extraHurt.push(o.id); }
+        }
+        for (const c of targets) { c.hp -= a2 || 1; c.danger++; ctx.hurt.push(c.id); if (c.hp <= 0) die(s, c, a3 || 'succumbed to their injuries', ctx); }
+        break;
+      }
       case 'heal': for (const c of pickTarget(s, a1 || 'injured', ctx)) { c.hp = Math.min(MAX_HP, c.hp + (a2 || 1)); ctx.healed.push(c.id); } break;
       case 'bite': for (const c of pickTarget(s, a1, ctx)) die(s, c, 'bitten by the infected', ctx); break;
       case 'kill': for (const c of pickTarget(s, a1, ctx)) { if (a3 === 'hero') { s.flags.sacrifice = true; s.log.heroic.push({ stage: s.stage, text: `${c.name} ${a2}` }); } die(s, c, a2, ctx); } break;
       case 'infect': for (const c of pickTarget(s, a1, ctx)) { if (!c.infected) { c.infected = { at: s.stage, resolved: false }; c.danger++; } } break;
       case 'cure': for (const c of alive(s)) { if (c.infected && c.infected.resolved !== 'cured') c.infected = { ...c.infected, resolved: 'cured' }; } break;
       case 'conceal': for (const c of pickTarget(s, a1, ctx)) { if (c.infected) c.infected.resolved = 'concealed'; s.flags.concealed = true; } break;
-      case 'em': { const tgt = pickTarget(s, a1 || 'r', ctx)[0]; if (tgt) { const opts = adv.emergencies.filter((id) => id !== s.lastEm); const id = r.pick(opts.length ? opts : adv.emergencies); s.lastEm = id; tgt.danger++; s.pending.unshift({ id, cast: { t: tgt.id } }); ctx.danger = true; } break; }
+      case 'em': {
+        const tgt = pickTarget(s, a1 || 'r', ctx)[0];
+        if (tgt) {
+          const opts = adv.emergencies.filter((id) => id !== s.lastEm); const id = r.pick(opts.length ? opts : adv.emergencies); s.lastEm = id; tgt.danger++; s.pending.unshift({ id, cast: { t: tgt.id } }); ctx.danger = true;
+          // in a big group, more of them come
+          const x = spread(s).em; let extra = Math.floor(x) + (r.chance(x % 1) ? 1 : 0);
+          const others = r.shuffle(alive(s).filter((c) => c !== tgt));
+          while (extra-- > 0 && others.length) { const o = others.pop(); const id2 = r.pick(adv.emergencies); s.pending.splice(1, 0, { id: id2, cast: { t: o.id } }); ctx.wave = (ctx.wave || 0) + 1; }
+        }
+        break;
+      }
       case 'next': s.pending.unshift({ id: a1, cast: { ...ctx.cast } }); break;
       case 'later': s.pending.push({ id: a1, cast: { ...ctx.cast } }); break;
       case 'flag': s.flags[a1] = a2 === undefined ? true : a2; break;
@@ -477,9 +515,14 @@ function applyFx(s, adv, fx, ctx) {
 }
 
 function resolveOutcome(s, adv, ev, o, label) {
-  const ctx = { cast: { ...s.cur.cast }, deaths: [], hurt: [], healed: [], gained: [], lost: [], adv, resolving: true, npcId: s.cur.npc, npc: s.cur.npc ? npcName(adv, s.cur.npc) : undefined };
+  const ctx = { cast: { ...s.cur.cast }, deaths: [], hurt: [], healed: [], gained: [], lost: [], extraHurt: [], adv, resolving: true, npcId: s.cur.npc, npc: s.cur.npc ? npcName(adv, s.cur.npc) : undefined };
   applyFx(s, adv, o.fx, ctx);
-  const text = fill(s, adv, o.t, ctx);
+  let text = fill(s, adv, o.t, ctx);
+  if (ctx.extraHurt.length) { const n = ctx.extraHurt.map((id) => nameOf(s, id)); text += ` In the chaos, ${listNames(n)} ${n.length > 1 ? 'are' : 'is'} hurt too.`; }
+  if (ctx.wave) text += ` And ${ctx.wave > 1 ? 'more of them are' : 'another one is'} coming.`;
+  // noise: bad outcomes draw more infected; quiet choices let it settle
+  const bad = ['hurt', 'danger', 'death', 'infect'].includes(o.k);
+  s.heat = Math.max(0, Math.min(MAX_HEAT, (s.heat || 0) + (bad ? (o.k === 'danger' ? 1.5 : 1) : -0.75)));
   if (ctx.funny) s.log.funny.push({ stage: s.stage, text });
   if (ctx.hero) s.log.heroic.push({ stage: s.stage, text });
   const major = ev && (['moral', 'rescue', 'finale', 'timeout', 'turn', 'emergency', 'travel'].includes(ev.cat) || ev.major);

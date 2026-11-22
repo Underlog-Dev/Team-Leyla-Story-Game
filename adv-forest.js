@@ -784,7 +784,7 @@ const events = [
   // ---------------- EMERGENCIES ----------------
   E('em_lunge', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `From the Trees!`,
-    text: [`An infected crashes out of the undergrowth straight at {t}! Branches snap. Its arms are outstretched, mouth open, just a stride away.`],
+    text: [`An infected crashes out of the undergrowth straight at {t}! Branches snap. Its arms are outstretched, mouth open, just a stride away.`, `A figure in a torn hiking jacket stumbles out of the ferns and lunges at {t}!`, `{t} brushes past a tree, and the tree has arms. An infected ranger grabs for {t}!`],
     scene: { z: 1, light: 'alert' }, cast: ['t!', 'h?'], say: [['h', `"{t}! Behind you!"`], ['t', `"No no no no NO!"`, 'Nervous']],
     choices: [
       C(`{t} dodges behind a tree`, `Put a trunk between you.`, [O(0.6, 'good', `{t} spins round a thick pine. It crashes into the bark. {t} is gone.`), O(0.22, 'hurt', `{t} dodges, but its nails rake their shoulder.`, [['hurt', 't', 1]]), O(0.08, 'infect', `{t} escapes, but there is a scratch on their neck. It is turning dark already.`, [['hurt', 't', 1], ['infect', 't']]), O(0.1, 'death', `It catches {t} against the tree.`, [['bite', 't']])]),
@@ -806,7 +806,7 @@ const events = [
   }),
   E('em_grab', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `Dragged Down!`,
-    text: [`Something buried in the bracken seizes {t}'s ankle and pulls. {t} hits the ground hard and is being dragged backwards through the ferns.`],
+    text: [`Something buried in the bracken seizes {t}'s ankle and pulls. {t} hits the ground hard and is being dragged backwards through the ferns.`, `The ground near the path is not ground. A buried hand bursts up and drags {t} down by the boot!`, `{t} slips into a ditch, and something already lying there grabs hold and will not let go!`],
     scene: { z: 2, light: 'alert' }, cast: ['t!', 'h?'], say: [['h', `"Grab my hand! GRAB MY HAND!"`], ['t', `"It has got my LEG!"`]],
     choices: [
       C(`Pull {t} free`, `Everyone heave.`, [O(0.68, 'good', `A tug of war, and {t} comes free, minus one hiking boot.`, [['funny']]), O(0.17, 'hurt', `{t} comes free with a deep scrape down one leg.`, [['hurt', 't', 1]]), O(0.07, 'infect', `{t} is free, but its nails broke the skin. The scratch is already darkening.`, [['hurt', 't', 1], ['infect', 't']]), O(0.08, 'death', `Another one rises from the ferns and bites {t}.`, [['bite', 't']])], { req: { minAlive: 2 } }),
@@ -827,7 +827,7 @@ const events = [
   }),
   E('em_surround', {
     cat: 'emergency', loc: '*', essential: true, repeat: true, title: `Surrounded in the Fog`,
-    text: [`Fog drifts between the trees. {t} wanders a few steps from the group to check a noise, and three shapes close in from three sides. {t} is trapped against a fallen trunk.`],
+    text: [`Fog drifts between the trees. {t} wanders a few steps from the group to check a noise, and three shapes close in from three sides. {t} is trapped against a fallen trunk.`, `{t} follows a noise behind a rock and walks into a ring of three infected campers.`, `Mist curls between the pines. When it clears, {t} is surrounded on three sides.`],
     scene: { z: 3, light: 'fog' }, cast: ['t!', 'h?'], say: [['h', `"{t}! Where are you?!"`], ['t', `"Over here! A little help!"`], ['t', `"I can handle three. Probably."`, 'Brave']],
     choices: [
       C(`{t} vaults the fallen trunk`, `Over and away.`, [O(0.55, 'good', `{t} clears the trunk in one leap and is gone into the fog.`), O(0.27, 'hurt', `{t} gets over, but lands badly on the other side.`, [['hurt', 't', 1]]), O(0.08, 'infect', `{t} vaults it, but one of them got a scratch in first. It stings.`, [['hurt', 't', 1], ['infect', 't']]), O(0.1, 'death', `{t} is grabbed mid-vault.`, [['bite', 't']])]),
@@ -916,6 +916,7 @@ const events = [
     text: [`Inside the control room: a dusty console with a big red switch marked RESCUE BEACON. A warning light reads NO POWER. A fuse slot in a grey box hangs open and empty. Through the window, the generator shed. Outside, fists are already hammering on the door.`],
     scene: { bg: 'ranger', light: 'night', z: 3 }, cast: ['t?=@infected', 'a', 'b?'], say: [['a', `"Power. We need power. Now."`], ['b', `"Fuse goes in the box. Or fuel in the generator. Either one."`, 'Engineer']],
     choices: [
+      C(`Let {npc} power the beacon while you hold the door`, `{npc} offers to run out to the generator shed.`, [{ p: 0.7, k: 'good', t: `{npc} sprints to the shed and rigs the old generator. The beacon roars to life. "Told you I'd get it going!"`, fx: [['flag','reached']], loyalty: 'loyal'}, { p: 0.3, k: 'good', t: `{npc} gets the generator running, then holds the shed door shut against the horde so {team} can reach the helicopter. {npc} never makes it out.`, fx: [['flag','reached'],['npcdie','held the generator shed so the beacon could call the helicopter']], loyalty: 'loyal'}, { p: 0.55, k: 'good', t: `It takes {npc} three tries and a lot of swearing, but the generator catches. The beacon pulses.`, fx: [['flag','reached']], loyalty: 'ordinary'}, { p: 0.45, k: 'bad', t: `{npc} cannot get the generator started. {Team} barricades in and waits for dawn.`, fx: [['flag','overrun']], loyalty: 'ordinary'}, { p: 1, k: 'bad', t: `{npc} powers the beacon, walks out to the helicopter when it lands, and tells the pilot everyone else is infected. The helicopter lifts off with one passenger.`, fx: [['flag','betrayed']], loyalty: 'traitor'}], { req: { companion: true, companionHuman: true } }),
       C(`Look for Wade`, `Where did he go?`, [O(1, 'bad', `Wade is already at the beacon, the fuse in his hand. He powers it up, then locks the door to the helipad behind him. "Sorry. One seat."`, [['flag', 'betrayed']])], { req: { flags: ['wade_deal'] } }),
       C(`Fit the beacon fuse`, `Slot the spare fuse into the grey box.`, [O(1, 'good', `The fuse clicks home. Lights flicker on. {a} slams the red switch. Far above, the beacon begins to pulse. Within the hour: rotor blades.`, [['use', 'fuse'], ['flag', 'reached']])], { req: { items: ['fuse'] } }),
       C(`Fuel the generator`, `Run out to the shed with the jerrycan.`, [O(0.8, 'good', `A dash to the shed, a glug of petrol, a pull of the cord. The generator roars. The beacon lights up. Rescue is coming.`, [['use', 'fuel'], ['flag', 'reached']]), O(0.2, 'death', `The generator roars into life and the beacon lights. But {r} is caught outside on the way back.`, [['use', 'fuel'], ['flag', 'reached'], ['bite', 'r']])], { req: { items: ['fuel'] } }),
@@ -945,11 +946,11 @@ const events = [
 ];
 
 const T = travelTables({
-  lowOk: [`A long, quiet walk through the trees. Nothing stirs.`, `The detour is slow but peaceful.`],
-  medOk: [`{Team} reaches {loc} without trouble.`, `A tense hike, but everyone makes it.`],
-  highOk: [`A fast, risky push through rough ground, and it pays off.`, `{Team} covers the ground quickly.`],
-  hurt: [`On the way, {r} trips on a root and falls hard.`, `{r} slides down a muddy bank on the way.`],
-  danger: [`Halfway there, an infected lurches out from behind a trunk at {r}!`, `On the way, something bursts from the bracken at {r}!`],
+  lowOk: [`A long, quiet walk through the trees. Nothing stirs.`, `The detour is slow but peaceful.`, `Birdsong, of all things. The long way round is completely calm.`, `Mossy paths and fallen leaves. Not a single groan the whole way.`, `A slow, winding trail, but it feels almost like a normal hike.`, `Deer tracks and a babbling stream. Nothing else.`, `The quiet route takes forever, but it stays quiet.`, `Squirrels chatter overhead. For once, that is the only sound.`],
+  medOk: [`{Team} reaches {loc} without trouble.`, `A tense hike, but everyone makes it.`, `Twice the bracken rustles. Twice it is just the wind. Then {loc}.`, `Crows circle somewhere to the north as {team} reaches {loc}.`, `The trail is muddy and steep, but nobody falls.`, `Something howls far away. {Team} walks a little faster to {loc}.`, `Branches snap in the distance. Nothing comes closer.`, `Fog rolls in and out. {Team} reaches {loc} in one piece.`],
+  highOk: [`A fast, risky push through rough ground, and it pays off.`, `{Team} covers the ground quickly.`, `Crashing straight downhill through the ferns. Fast, loud, and it works.`, `A sprint across open ground before anything notices.`, `Scrambling over rocks and roots, {team} saves a lot of time.`, `Ducking branches at full speed. Nothing keeps up.`, `A wild dash through the trees, and {team} arrives well ahead of the horde.`, `Reckless and muddy, but very fast.`],
+  hurt: [`On the way, {r} trips on a root and falls hard.`, `{r} slides down a muddy bank on the way.`, `A branch whips back into {r}'s face.`, `{r} steps into a hidden hole and wrenches a knee.`, `Brambles tear at {r}'s arms all the way down the slope.`, `{r} slips on wet rock and lands on one hip.`],
+  danger: [`Halfway there, an infected lurches out from behind a trunk at {r}!`, `On the way, something bursts from the bracken at {r}!`, `A shape drops out of a low tree right next to {r}!`, `Something was lying in the stream. It rises as {r} crosses.`, `An infected camper staggers out of a tent at {r}!`],
 });
 
 export default {
@@ -976,11 +977,11 @@ export default {
     rambler: { name: `the rambler`, traitor: 0.1, loyal: 0.5, skin: '#eeb48b', hair: '#9b9aa3', hat: 'wide', hatC: '#7d4cc9', shirt: '#7d4cc9', legs: '#2b2d42' },
   },
   items, locations, events: [...events, ...companionEvents(A)], defaultLoot: ['bandages', 'trail_mix', 'berries', 'batteries'],
-  travelText: [`{loc} is behind {team} now. Three ways lead on toward the ranger station. {clock} until the forest is overrun.`, `Time to leave {loc}. Which way now? The horde reaches this valley in {clock}.`],
+  travelText: [`{loc} is behind {team} now. Three ways lead on toward the ranger station. {clock} until the forest is overrun.`, `Time to leave {loc}. Which way now? The horde reaches this valley in {clock}.`, `The trees are thinning. Three paths onward from {loc}, and {clock} before the horde arrives.`, `Somewhere behind, thousands of feet are moving. {clock} left. Which path from {loc}?`, `The radio mast is still a long way east. {clock} on the clock. Pick a path.`],
   travelSay: [['a', [`"Which way? Quickly."`, `"Pick a path. We cannot stay."`, `"East. Which way is east?"`]]],
   travelOutcomes: T,
-  restChoice: { l: `Rest and patch up first`, d: `Heal one injury, but lose time. You will choose the path after.`, o: [O(0.85, 'good', `A short rest in a hollow. Wounds are cleaned and bound.`, [['heal', 'injured', 1], ['time', -2]]), O(0.15, 'danger', `The rest is interrupted. Something finds {r}!`, [['em', 'r'], ['time', -1]])] },
-  scavengeChoice: { l: `Search {loc} one more time`, d: `One more look around before moving on. Costs time.`, o: [O(0.6, 'item', `One last search turns up {loot}.`, [['loot'], ['time', -1]]), O(0.4, 'neutral', `Nothing more to find.`, [['time', -1]])] },
+  restChoice: { l: `Rest and patch up first`, d: `Heal one injury, but lose time. You will choose the path after.`, o: [O(0.85, 'good', [`A short rest in a hollow. Wounds are cleaned and bound.`, `Everyone sits on a fallen log. Water, bandages, a few deep breaths.`, `A pause under a rock overhang. The worst scratches are washed in a stream.`, `A quiet glade, ten minutes, and fresh bandages all round.`, `A rest in a ruined shepherd's hut. Wounds are cleaned with boiled water.`, `Backs against a huge oak, {team} patches each other up.`], [['heal', 'injured', 1], ['time', -2]]), O(0.15, 'danger', [`The rest is interrupted. Something finds {r}!`, `Just as everyone sits down, the bracken parts beside {r}!`, `The quiet does not last. Something has followed {team} through the trees, and it goes for {r}!`], [['em', 'r'], ['time', -1]])] },
+  scavengeChoice: { l: `Search {loc} one more time`, d: `One more look around before moving on. Costs time.`, o: [O(0.6, 'item', [`One last search turns up {loot}.`, `A final look round pays off: {loot}.`, `Under a mossy stone: {loot}.`, `Someone checks a hollow tree one more time. {loot}.`, `On the way out, {r} spots {loot} in the undergrowth.`], [['loot'], ['time', -1]]), O(0.4, 'neutral', [`Nothing more to find.`, `A second search turns up only pinecones.`, `Still nothing. Time to go.`, `Nothing but mud and leaves.`, `Nothing new. The forest keeps its secrets.`], [['time', -1]])] },
   quips: { ...GENERIC_QUIPS, Any: [...GENERIC_QUIPS.Any, `"Remind me never to go camping again. Ever."`, `"I think something just touched my leg. It was a fern. It was definitely a fern."`] },
   deathLines: GENERIC_DEATH_LINES,
   endings: [

@@ -174,10 +174,10 @@ const SCREENS = {
     return `<div class="play ${S.flash ? 'flash' : ''}" style="--accent:${a.colour}">
       <header class="topbar">
         <button class="icon-btn" data-a="homeConfirm" aria-label="Home">🏠</button>
-        <div class="tb-mid"><div class="tb-title">${h(a.title)}</div><div class="tb-sub">Stage ${g.stage} · ⏱ ${formatClock(a, g.clock)}</div></div>
+        <div class="tb-mid"><div class="tb-title">${h(a.title)}</div><div class="tb-sub">Stage ${g.stage} · ⏱ ${formatClock(a, g.clock)}</div><div class="heat" title="Noise: risky outcomes draw more infected and raise every danger">🧟 Noise <span>${Array.from({ length: 4 }, (_, i) => `<i class="${(g.heat || 0) > i * 2 ? 'on' : ''}"></i>`).join('')}</span></div></div>
         <button class="icon-btn" data-a="textSize" aria-label="Text size">Aa</button>
       </header>
-      <div class="roster">${party.map((c) => `<div class="mini ${c.alive ? '' : 'dead'} ${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? 'infected' : ''}" title="${h(c.name)}: ${c.alive ? hpLabel(c.hp) : 'Dead'}">
+      <div class="roster ${party.length > 7 ? 'many' : ''}">${party.length > 7 ? `<div class="alive-count">${party.filter((c) => c.alive).length}/${party.length} alive</div>` : ''}${party.map((c) => `<div class="mini ${c.alive ? '' : 'dead'} ${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? 'infected' : ''}" title="${h(c.name)}: ${c.alive ? hpLabel(c.hp) : 'Dead'}">
         <div class="pic">${avatarSVG(c.avatar, { size: 38 })}${c.alive ? '' : '<div class="xmark">✕</div>'}</div>
         <span class="nm">${h(c.name)}</span><span class="hp">${c.alive ? '♥'.repeat(c.hp) + '<i>' + '♥'.repeat(MAX_HP - c.hp) + '</i>' : '0/3'}</span></div>`).join('')}</div>
       ${g.npcs.length ? `<div class="companions">With you: ${g.npcs.map((id) => `<b>${h(npcName(a, id))}</b>`).join(', ')}</div>` : ''}

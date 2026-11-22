@@ -9,11 +9,12 @@ export const C = (l, d, o, extra = {}) => ({ l, d, o, ...extra });
 export const U = (t, fx = [], extra = {}) => ({ t, fx, ...extra });
 
 const POOL = {
-  item: ['{r} digs out {loot} and stuffs it into the backpack.', 'Not everything was taken. {r} comes back holding {loot}.', 'Under the mess, {r} finds {loot}.', 'Jackpot. {r} finds {loot}.'],
-  hurt: ['{r} slices a palm open on a jagged edge.', '{r} twists an ankle on the rubble.', 'Something heavy topples onto {r}.', '{r} slips and lands hard on one shoulder.'],
-  danger: ['Something moves in the dark. It is heading straight for {r}!', 'A shape lunges out of cover toward {r}!', '{r} turns a corner into a snarling face!'],
-  none: ['Nothing useful. Just dust and silence.', 'Picked clean. Someone got here first.', 'A waste of time, but nobody got hurt.'],
-  safe: ['Slow and steady. Nothing goes wrong.', '{Team} moves on carefully and quietly.', 'No trouble. For once, the quiet way works.'],
+  item: ['{r} digs out {loot} and stuffs it into the backpack.', 'Not everything was taken. {r} comes back holding {loot}.', 'Under the mess, {r} finds {loot}.', 'Jackpot. {r} finds {loot}.', '{r} lets out a quiet whoop: {loot}, right where nobody thought to look.', 'Behind a loose panel, {r} spots {loot}.', '{r} nearly misses it, then doubles back for {loot}.', 'Somebody hid {loot} here and never came back for it. Their loss.', '{r} holds up {loot} like a trophy.', 'A good find: {loot}. {r} packs it carefully.', 'Tucked away out of sight: {loot}. {r} grabs it.', '{r} shakes out a bag and {loot} drops onto the floor.'],
+  hurt: ['{r} slices a palm open on a jagged edge.', '{r} twists an ankle on the rubble.', 'Something heavy topples onto {r}.', '{r} slips and lands hard on one shoulder.', '{r} catches a forearm on a sharp corner. It bleeds a lot.', 'A rotten board gives way under {r}, scraping a shin raw.', '{r} cracks their head on something low and sees stars.', '{r} jams a finger reaching into a gap. Something pops.', 'A shard of glass finds {r}\'s knee.', '{r} trips over nothing at all and lands badly.'],
+  danger: ['Something moves in the dark. It is heading straight for {r}!', 'A shape lunges out of cover toward {r}!', '{r} turns a corner into a snarling face!', 'A low groan right behind {r}. Too close. Far too close.', 'Something that was lying still suddenly is not, and it grabs for {r}!', '{r} hears the shuffle a second too late. It is already reaching.', 'A door bangs open beside {r}. Something comes through it fast.', 'Hands appear out of the shadows, reaching for {r}!'],
+  none: ['Nothing useful. Just dust and silence.', 'Picked clean. Someone got here first.', 'A waste of time, but nobody got hurt.', 'Empty, apart from a very old sandwich.', 'Nothing worth carrying. {Team} moves on.', 'Every drawer and corner: nothing.', 'Somebody else was more thorough. Nothing left.', 'Ten minutes of searching. Zero to show for it.', 'Just junk. Lots and lots of junk.', 'Nothing here but bad smells.'],
+  safe: ['Slow and steady. Nothing goes wrong.', '{Team} moves on carefully and quietly.', 'No trouble. For once, the quiet way works.', 'Careful steps, held breath, and no surprises.', 'It takes a while, but nothing finds {team}.', 'Quiet. Uneventful. Exactly how it should be.', '{Team} takes it slow. Nobody regrets it.', 'Patience pays off. Not a single scare.', 'A careful, boring stretch. Boring is good.', 'Nothing stirs. {Team} keeps going.'],
+  rushOk: ['{Team} pushes through fast and gains precious time.', 'Risky, but it works. Time saved.', 'Heart pounding, {team} makes it through in record time.', 'A mad dash, and nothing catches up.', 'Fast and reckless, and it pays off this time.', 'Nobody stops to think. Somehow that works.', 'Lungs burning, {team} is through before anything reacts.', 'Speed beats caution, just this once.'],
 };
 
 // Search / explore: chance of loot, injury and an emergency. Costs time.
@@ -37,7 +38,7 @@ export function rush(l, d, { hurt = 0.18, danger = 0.08, time = 1, t = {}, fx = 
   const o = [];
   if (hurt) o.push(O(hurt, 'hurt', t.hurt || POOL.hurt, [['hurt', 'r', 1], ['time', time], ...fx]));
   if (danger) o.push(O(danger, 'danger', t.danger || POOL.danger, [['em', 'r'], ...fx]));
-  o.push(O(1 - hurt - danger, 'good', t.ok || ['{Team} pushes through fast and gains precious time.', 'Risky, but it works. Time saved.'], [['time', time], ...fx]));
+  o.push(O(1 - hurt - danger, 'good', t.ok || POOL.rushOk, [['time', time], ...fx]));
   return C(l, d, o, extra);
 }
 
@@ -45,6 +46,7 @@ export function rush(l, d, { hurt = 0.18, danger = 0.08, time = 1, t = {}, fx = 
 export const pick = C;
 
 // Travel outcome tables by risk level (used by the generated travel stage)
+export { POOL };
 export function travelTables(text) {
   return {
     low: [O(0.9, 'neutral', text.lowOk), O(0.1, 'hurt', text.hurt, [['hurt', 'r', 1]])],
