@@ -1,5 +1,5 @@
 // Character data: creation, validation, export and import. Pure functions.
-import { normaliseAvatar, randomAvatar, TRAITS, ROLE_LIST } from './avatar.js';
+import { normaliseAvatar, randomAvatar, TRAITS, ROLE_LIST, AVATAR_OPTIONS } from './avatar.js';
 import { hashSeed } from './rng.js';
 
 export const MAX_CHARACTERS = 20;
@@ -81,16 +81,32 @@ export function mergeLibrary(existing, incoming, mode = 'merge') {
   return { list: [...byId.values()], added, updated, dropped };
 }
 
-// A ready-made crew for players who just want to jump in.
+// The default Team Leyla crew. Everyone can be edited or deleted in the library.
+function av(o) {
+  const out = {};
+  for (const opt of AVATAR_OPTIONS) {
+    const v = o[opt.key];
+    if (typeof v === 'string') { let k = 0; while (k < opt.count && opt.name(k) !== v) k++; out[opt.key] = k < opt.count ? k : 0; }
+    else out[opt.key] = Number.isInteger(v) ? v : 0;
+  }
+  return out;
+}
+const F = (o) => av({ beard: 'None', stache: 'None', ...o });
 export const STARTER_CREW = [
-  { name: 'Mo', role: 'Medic', traits: ['Kind', 'Nervous'], description: 'Night-shift nurse. Has seen worse. Probably.', avatar: { skin: 6, hair: 3, hairColour: 0, eyes: 0, eyeColour: 0, mouth: 0, beard: 2, stache: 0, facialColour: 0, eyewear: 1, hat: 0, hatColour: 0, acc: 7, bg: 5 } },
-  { name: 'Bex', role: 'Engineer', traits: ['Sarcastic', 'Practical'], description: 'Can fix anything with tape and swearing.', avatar: { skin: 1, hair: 8, hairColour: 4, eyes: 7, eyeColour: 2, mouth: 4, beard: 0, stache: 0, facialColour: 4, eyewear: 5, hat: 0, hatColour: 4, acc: 4, bg: 2 } },
-  { name: 'Tank', role: 'Fighter', traits: ['Brave', 'Loyal'], description: 'Ex-bouncer. Has a soft spot for dogs.', avatar: { skin: 8, hair: 0, hairColour: 0, eyes: 5, eyeColour: 0, mouth: 1, beard: 2, stache: 0, facialColour: 0, eyewear: 3, hat: 0, hatColour: 3, acc: 2, bg: 3 } },
-  { name: 'Skye', role: 'Scout', traits: ['Nature lover', 'Mysterious'], description: 'Always somehow knows the way.', avatar: { skin: 3, hair: 7, hairColour: 5, eyes: 0, eyeColour: 1, mouth: 4, beard: 0, stache: 0, facialColour: 5, eyewear: 0, hat: 8, hatColour: 2, acc: 0, bg: 1 } },
-  { name: 'Captain Jo', role: 'Leader', traits: ['Brave', 'Practical'], description: 'Ran a Scout troop for twenty years. Nothing scares her.', avatar: { skin: 0, hair: 6, hairColour: 7, eyes: 5, eyeColour: 4, mouth: 1, beard: 0, stache: 0, facialColour: 7, eyewear: 1, hat: 1, hatColour: 1, acc: 0, bg: 9 } },
-  { name: 'Zippy', role: 'Athlete', traits: ['Funny', 'Reckless'], description: 'Marathon runner. Will not stop talking about it.', avatar: { skin: 4, hair: 3, hairColour: 1, eyes: 4, eyeColour: 3, mouth: 2, beard: 0, stache: 0, facialColour: 1, eyewear: 0, hat: 5, hatColour: 0, acc: 5, bg: 11 } },
-  { name: 'Dex', role: 'Fighter', traits: ['Gamer', 'Funny'], description: 'Has played every zombie game. Thinks this is one.', avatar: { skin: 2, hair: 11, hairColour: 10, eyes: 7, eyeColour: 5, mouth: 4, beard: 0, stache: 0, facialColour: 1, eyewear: 0, hat: 10, hatColour: 7, acc: 0, bg: 4 } },
-  { name: 'Nana Pat', role: 'Medic', traits: ['Kind', 'Foodie'], description: 'Retired midwife. Carries biscuits at all times.', avatar: { skin: 1, hair: 12, hairColour: 8, eyes: 4, eyeColour: 1, mouth: 0, beard: 0, stache: 0, facialColour: 8, eyewear: 1, hat: 0, hatColour: 5, acc: 5, bg: 8 } },
+  { name: 'Leyla', role: 'Leader', traits: ['Brave', 'Funny'], description: 'The host. Calls the shots, keeps the crew alive (mostly).', avatar: F({ skin: 1, hair: 'Long fringe', hairColour: 'Black', eyes: 'Lashes', eyeColour: 'Brown', mouth: 'Smile', bg: 7 }) },
+  { name: 'Bravo', role: 'Fighter', traits: ['Mysterious', 'Brave'], description: 'Part survivor, part cat. Always lands on his feet, always in a suit.', avatar: av({ skin: 'Grey-blue fur', hair: 'Short', hairColour: 'Grey-blue', eyes: 'Normal', eyeColour: 'Green', mouth: 'Smirk', hat: 'Cat ears', hatColour: 'Grey-blue', acc: 'Whiskers', outfit: 'Suit & bow tie', bg: 9 }) },
+  { name: 'Chris', role: 'Engineer', traits: ['Practical', 'Intelligent'], description: 'Can rig anything that has wires in it.', avatar: av({ skin: 1, hair: 'Messy', hairColour: 'Brown going grey', eyes: 'Normal', eyeColour: 'Brown', mouth: 'Smile', beard: 'Short beard', facialColour: 'Dark brown', bg: 1 }) },
+  { name: 'Hyrisha', role: 'Athlete', traits: ['Kind', 'Funny'], description: 'Fastest legs in the crew. Waves never out of place.', avatar: F({ skin: 1, hair: 'Long wavy', hairColour: 'Brown', eyes: 'Happy', mouth: 'Smile', bg: 8 }) },
+  { name: 'Hiwi', role: 'Medic', traits: ['Kind', 'Intelligent'], description: 'Calm hands, sharp mind. Patches everyone up.', avatar: F({ skin: 9, hair: 'Long', hairColour: 'Black', eyes: 'Lashes', eyeColour: 'Brown', mouth: 'Smile', bg: 11 }) },
+  { name: 'Dardan', role: 'Scout', traits: ['Nature lover', 'Practical'], description: 'Knows every trail, every plant, every shortcut.', avatar: av({ skin: 1, hair: 'Short', hairColour: 'Dark brown', eyes: 'Normal', eyeColour: 'Hazel', mouth: 'Neutral', beard: 'Full beard', facialColour: 'Dark brown', bg: 2 }) },
+  { name: 'Sonila', role: 'Scout', traits: ['Brave', 'Sarcastic'], description: 'Spots trouble before it spots her.', avatar: F({ skin: 1, hair: 'Long', hairColour: 'Brown', eyes: 'Lashes', eyeColour: 'Brown', mouth: 'Smirk', bg: 6 }) },
+  { name: 'Isma', role: 'Medic', traits: ['Kind', 'Loyal'], description: 'Never leaves anyone behind.', avatar: F({ skin: 1, hair: 'Bald', eyes: 'Lashes', eyeColour: 'Brown', mouth: 'Smile', hat: 'Headscarf', hatColour: 'Plum', bg: 1 }) },
+  { name: 'Doa', role: 'Engineer', traits: ['Intelligent', 'Funny'], description: 'Fixes it first, explains it later.', avatar: F({ skin: 1, hair: 'Bald', eyes: 'Happy', mouth: 'Grin', hat: 'Headscarf', hatColour: 'Black', bg: 5 }) },
+  { name: 'Toddy', role: 'Athlete', traits: ['Funny', 'Reckless'], description: 'Bucket hat on, no plan, full speed.', avatar: av({ skin: 3, hair: 'Bald', hairColour: 'Dark brown', eyes: 'Normal', eyeColour: 'Brown', mouth: 'Grin', beard: 'Goatee', stache: 'Thin', facialColour: 'Dark brown', hat: 'Bucket hat', hatColour: 'Blue', bg: 10 }) },
+  { name: 'Hatice', role: 'Medic', traits: ['Kind', 'Nature lover'], description: 'Never goes anywhere without her cat, Kheria.', avatar: F({ skin: 1, hair: 'Long', hairColour: 'Black', eyes: 'Lashes', eyeColour: 'Brown', mouth: 'Smile', acc: 'Blush', bg: 4 }) },
+  { name: 'Gaza', role: 'Fighter', traits: ['Gamer', 'Brave'], description: 'Thousands of hours of practice. Finally, real life.', avatar: av({ skin: 2, hair: 'Buzz cut', hairColour: 'Black', eyes: 'Angry', eyeColour: 'Brown', mouth: 'Neutral', hat: 'Helmet', acc: 'Face paint', outfit: 'Army', bg: 2 }) },
+  { name: 'Loni', role: 'Fighter', traits: ['Brave', 'Reckless'], description: 'The hair goes up when the fight starts.', avatar: av({ skin: 1, hair: 'Huge spiky', hairColour: 'Turquoise', eyes: 'Angry', eyeColour: 'Green', mouth: 'Grin', bg: 3 }) },
+  { name: 'Ikram', role: 'Scout', traits: ['Mysterious'], description: 'Nobody knows where he came from. Nobody asks.', avatar: av({ skin: 4, hair: 'Short', hairColour: 'Black', eyes: 'Normal', mouth: 'Neutral', hat: 'Cap', hatColour: 'Black', acc: 'Silhouette', bg: 10 }) },
 ];
 export function starterCrew(existingNames = []) {
   return STARTER_CREW.filter((c) => !existingNames.includes(c.name)).map((c, i) => makeCharacter({ ...c, id: 'c_starter_' + c.name.toLowerCase().replace(/[^a-z]/g, ''), created: Date.now() + i }));

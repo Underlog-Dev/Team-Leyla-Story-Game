@@ -304,3 +304,32 @@ input:focus, textarea:focus { outline: 3px solid var(--yellow); }
 .inf-banner { display: flex; gap: 10px; align-items: flex-start; margin: 6px 12px; border-left: 6px solid #6ab04c; background: #1a2614; }
 .ib-text { display: flex; flex-direction: column; gap: 4px; font-size: .85em; }
 .ib-text b { color: #c5f27a; }
+
+/* ---------- Solo / Streamer mode ---------- */
+.mode-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 12px 4px; }
+.mode-opt { display: flex; flex-direction: column; gap: 2px; text-align: center; padding: 10px 6px; background: var(--panel); color: var(--text); border: 3px solid var(--edge); font-family: var(--body); font-size: .9em; cursor: pointer; touch-action: manipulation; }
+.mode-opt span { font-size: .72em; color: var(--dim); }
+.mode-opt.on { background: #3b3214; outline: 3px solid var(--yellow); outline-offset: -3px; }
+body[data-mode="stream"] { --fs: 25px; }
+body[data-mode="stream"][data-ts="2"] { --fs: 29px; }
+body[data-mode="stream"][data-ts="3"] { --fs: 33px; }
+body[data-mode="stream"] .choice .num { font-size: 18px; padding: 8px 10px; min-width: 40px; text-align: center; background: var(--yellow); color: #1a1208; }
+.choice .cl { flex: 1; }
+.stream-tools { padding: 0 12px 4px; }
+.stream-tools .btn { flex: 1; }
+.thanks { font-size: 1.1em; color: var(--yellow); }
+.stream-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(5, 4, 8, .86); padding: 16px; }
+.drum { text-align: center; animation: pop .3s ease-out; }
+.drum-l { font-family: var(--title); font-size: 14px; color: var(--yellow); letter-spacing: 2px; }
+.drum-big { font-family: var(--title); font-size: 96px; color: var(--yellow); text-shadow: 5px 5px 0 #000; margin: 14px 0; animation: drumpop 1.7s ease-out both; }
+.drum-t { font-size: 1.1em; max-width: 420px; margin: 0 auto; }
+.drum-dots { margin-top: 12px; animation: shake .25s linear infinite; }
+@keyframes drumpop { 0% { transform: scale(.2); opacity: 0; } 50% { transform: scale(1.25); opacity: 1; } 70% { transform: scale(.95); } 100% { transform: scale(1); } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+.death-card { max-width: 460px; width: 100%; text-align: center; border: 4px solid var(--red); background: #1f0b10; animation: pop .35s ease-out; }
+.dc-skull { font-size: 46px; line-height: 1; }
+.dc-avs { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+.dc-avs .pic { position: relative; }
+.dc-avs .px-avatar { filter: grayscale(.7) brightness(.7); }
+.dc-avs .xmark { font-size: 64px; }
+.dc-title { font-family: var(--title); font-size: 16px; color: var(--red); line-height: 1.5; text-shadow: 3px 3px 0 #000; }

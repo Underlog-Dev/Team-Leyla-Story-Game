@@ -25,6 +25,7 @@ async function boot() {
     if (S.save && !advById(S.save.adv)) S.save = null;
     // give older characters a role (roles became required)
     for (let i = 0; i < S.chars.length; i++) { if (!S.chars[i].role) { S.chars[i] = makeCharacter({ ...S.chars[i] }); try { await S.store.saveCharacter(S.chars[i]); } catch {} } }
+    await seedTeamLeyla();
   } catch (e) {
     console.error(e);
     S.toast = 'Saving is unavailable in this browser. You can still play, but nothing will be remembered.';
@@ -35,11 +36,42 @@ async function boot() {
   render();
 }
 
-function applySettings() {
-  document.body.dataset.ts = S.settings.textSize || '1';
+// First run (or first run after this update): put the Team Leyla crew in the library.
+// The old generic starter characters are swapped out, unless they were renamed.
+const OLD_STARTERS = ['mo', 'bex', 'tank', 'skye', 'captainjo', 'zippy', 'dex', 'nanapat'];
+async function seedTeamLeyla() {
+  // Update 12: Chris's look was refined. Only touch him if he is still the untouched Update 11 version.
+  if (!S.settings.crewV3) {
+    const i = S.chars.findIndex((c) => c.id === 'c_starter_chris');
+    const c = S.chars[i];
+    if (c && c.avatar.hair === 15 && c.avatar.hairColour === 1 && c.avatar.beard === 1) {
+      const fresh = starterCrew([]).find((x) => x.name === 'Chris');
+      S.chars[i] = { ...c, avatar: fresh.avatar };
+      try { await S.store.saveCharacter(S.chars[i]); } catch {}
+    }
+    S.settings.crewV3 = true;
+    try { await S.store.setSettings(S.settings); } catch {}
+  }
+  if (S.settings.crewV2) return;
+  const old = S.chars.filter((c) => OLD_STARTERS.some((n) => c.id === 'c_starter_' + n && c.name.toLowerCase().replace(/[^a-z]/g, '') === n));
+  for (const c of old) { try { await S.store.deleteCharacter(c.id); } catch {} }
+  S.chars = S.chars.filter((c) => !old.includes(c));
+  const crew = starterCrew(S.chars.map((c) => c.name)).slice(0, Math.max(0, MAX_CHARACTERS - S.chars.length));
+  for (const c of crew) { try { await S.store.saveCharacter(c); S.chars.push(c); } catch {} }
+  S.settings.crewV2 = true;
+  try { await S.store.setSettings(S.settings); } catch {}
 }
 
-function go(screen) { S.screen = screen; S.modal = null; S.pack = null; history.replaceState(null, '', screen === 'home' ? location.pathname : '#' + screen); render(); window.scrollTo(0, 0); }
+const LETTERS = 'ABCDEFGH';
+const L = (i) => LETTERS[i] || String(i + 1);
+const streamOn = () => S.settings.mode === 'stream';
+
+function applySettings() {
+  document.body.dataset.ts = S.settings.textSize || '1';
+  document.body.dataset.mode = streamOn() ? 'stream' : 'solo';
+}
+
+function go(screen) { if (screen === 'play' && S.game) afterAdvance.seen = new Set(S.game.party.filter((c) => !c.alive).map((c) => c.id)); keepAwake(screen === 'play' && streamOn()); S.screen = screen; S.modal = null; S.pack = null; history.replaceState(null, '', screen === 'home' ? location.pathname : '#' + screen); render(); window.scrollTo(0, 0); }
 function toast(msg) { S.toast = msg; renderToast(); clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = null; renderToast(); }, 3200); }
 function renderToast() { let el = document.getElementById('toast'); if (!el) { el = document.createElement('div'); el.id = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); } el.textContent = S.toast || ''; el.className = S.toast ? 'show' : ''; }
 function modal(title, body, buttons) { S.modal = { title, body, buttons }; renderModal(); }
@@ -73,6 +105,10 @@ const SCREENS = {
     return `<div class="home">
       <div class="home-scene">${sceneSVG({ bg: 'station', z: 4, light: 'night' }, S.chars.slice(0, 4), { stage: 3 })}</div>
       <div class="logo"><div class="logo-top">TEAM LEYLA</div><div class="logo-main">SURVIVAL<br>STORIES</div><div class="logo-sub">A zombie story game for brave groups 🧟</div></div>
+      <div class="mode-pick" role="group" aria-label="Game mode">
+        <button class="mode-opt ${streamOn() ? '' : 'on'}" data-a="setMode" data-m="solo" aria-pressed="${!streamOn()}"><b>🎮 Solo</b><span>You make every choice</span></button>
+        <button class="mode-opt ${streamOn() ? 'on' : ''}" data-a="setMode" data-m="stream" aria-pressed="${streamOn()}"><b>📺 Streamer</b><span>Big text for chat, run a TikTok poll</span></button>
+      </div>
       <div class="menu">
         ${sv ? `<button class="btn big green" data-a="continue">▶ Continue Adventure<small>${h(advTitle)} · Stage ${sv.stage}</small></button>` : ''}
         <button class="btn big red" data-a="newAdventure">☠ New Adventure</button>
@@ -91,7 +127,7 @@ const SCREENS = {
       <div class="row wrap gap">
         <button class="btn green" data-a="newChar" ${full ? 'disabled' : ''}>＋ New Character</button>
         <button class="btn" data-a="randomChar" ${full ? 'disabled' : ''}>🎲 Random</button>
-        ${starterCrew(S.chars.map((c) => c.name)).length && !full ? `<button class="btn" data-a="addCrew">★ Starter crew</button>` : ''}
+        ${starterCrew(S.chars.map((c) => c.name)).length && !full ? `<button class="btn" data-a="addCrew">★ Team Leyla crew</button>` : ''}
         <button class="btn" data-a="exportLib" ${S.chars.length ? '' : 'disabled'}>⬇ Export</button>
         <button class="btn" data-a="importLib">⬆ Import</button>
       </div>
@@ -102,7 +138,7 @@ const SCREENS = {
           ${c.description ? `<div class="desc">${h(c.description)}</div>` : ''}
           <div class="row gap"><button class="btn small" data-a="editChar" data-id="${c.id}">Edit</button><button class="btn small red" data-a="delChar" data-id="${c.id}">Delete</button></div>
         </div>`).join('')}</div>`
-        : `<div class="empty panel"><p>No survivors yet. Create your first character, or add a few random ones to get going.</p><button class="btn green" data-a="addCrew">★ Add the starter crew (8 ready-made characters)</button><button class="btn" data-a="quickFour">🎲 Add 4 random survivors</button></div>`}
+        : `<div class="empty panel"><p>No survivors yet. Create your first character, or add a few random ones to get going.</p><button class="btn green" data-a="addCrew">★ Add the Team Leyla crew (14 ready-made characters)</button><button class="btn" data-a="quickFour">🎲 Add 4 random survivors</button></div>`}
       <p class="note">Characters are never deleted when they die in a story. Use Export to back them up or move them to another device.</p>
     </div>`;
   },
@@ -137,7 +173,7 @@ const SCREENS = {
       <div class="char-grid pickable">${S.chars.map((c) => `<button class="char-card panel ${S.selected.has(c.id) ? 'on' : ''}" data-a="toggleSel" data-id="${c.id}" aria-pressed="${S.selected.has(c.id)}">
         ${avatarSVG(c.avatar, { size: 64 })}<div class="char-name">${h(c.name)}</div>${roleChip(c.role)}<div class="tick">${S.selected.has(c.id) ? '✔' : ''}</div></button>`).join('')}</div>
       <div class="sticky-foot"><button class="btn big red" data-a="toAdventures" ${n ? '' : 'disabled'}>Next ▶ <small>${n ? `${n} survivor${n > 1 ? 's' : ''}` : 'pick at least 1'}</small></button></div>`
-        : `<div class="empty panel"><p>You need at least one character. Too busy to make your own? Use the starter crew.</p><button class="btn green" data-a="addCrew">★ Use the starter crew</button><button class="btn" data-a="quickFour">🎲 Add 4 random survivors</button><button class="btn" data-a="newChar">＋ Create one</button></div>`}
+        : `<div class="empty panel"><p>You need at least one character. Too busy to make your own? Use the Team Leyla crew.</p><button class="btn green" data-a="addCrew">★ Use the Team Leyla crew</button><button class="btn" data-a="quickFour">🎲 Add 4 random survivors</button><button class="btn" data-a="newChar">＋ Create one</button></div>`}
     </div>`;
   },
 
@@ -183,7 +219,7 @@ const SCREENS = {
     return `<div class="play ${S.flash ? 'flash' : ''}" style="--accent:${a.colour}">
       <header class="topbar">
         <button class="icon-btn" data-a="homeConfirm" aria-label="Home">🏠</button>
-        <div class="tb-mid"><div class="tb-title">${h(a.title)}</div><div class="tb-sub">${h(DIFFICULTY[g.diff || 'medium'].label)} · Stage ${g.stage} · ⏱ ${formatClock(a, g.clock)}</div><div class="heat" title="Noise: risky outcomes draw more infected and raise every danger">🧟 Noise <span>${Array.from({ length: 4 }, (_, i) => `<i class="${(g.heat || 0) > i * 2 ? 'on' : ''}"></i>`).join('')}</span></div></div>
+        <div class="tb-mid"><div class="tb-title">${h(a.title)}</div><div class="tb-sub">${streamOn() ? '📺 ' : ''}${h(DIFFICULTY[g.diff || 'medium'].label)} · Stage ${g.stage} · ⏱ ${formatClock(a, g.clock)}</div><div class="heat" title="Noise: risky outcomes draw more infected and raise every danger">🧟 Noise <span>${Array.from({ length: 4 }, (_, i) => `<i class="${(g.heat || 0) > i * 2 ? 'on' : ''}"></i>`).join('')}</span></div></div>
         <button class="icon-btn" data-a="textSize" aria-label="Text size">Aa</button>
       </header>
       <div class="roster ${party.length > 7 ? 'many' : ''}">${party.length > 7 ? `<div class="alive-count">${party.filter((c) => c.alive).length}/${party.length} alive</div>` : ''}${party.map((c) => `<div class="mini ${c.alive ? '' : 'dead'} ${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? 'infected' : ''}" title="${h(c.name)}: ${c.alive ? hpLabel(c.hp) : 'Dead'}">
@@ -193,15 +229,16 @@ const SCREENS = {
       <div class="scene-wrap">${sceneSVG(cur.scene, castChars, { stage: g.stage })}<div class="scene-title">${h(cur.title)}</div></div>
       <div class="story">
         ${last ? `<div class="outcome panel ${last.deaths.length ? 'bad' : last.kind === 'hurt' || last.kind === 'danger' || last.kind === 'infect' ? 'warn' : 'ok'}">
-          <div class="lbl">WHAT HAPPENED · <span>${h(last.choice)}</span></div><p>${h(last.text)}</p>
+          <div class="lbl">WHAT HAPPENED · <span>${last.letter ? `${h(last.letter)}: ` : ''}${h(last.choice)}</span></div><p>${h(last.text)}</p>
           <div class="chips">${last.gained.map((n) => `<span class="chip g">＋ ${h(n)}</span>`).join('')}${last.lost.map((n) => `<span class="chip r">－ ${h(n)}</span>`).join('')}${last.hurt.filter((n) => !last.deaths.includes(n)).map((n) => `<span class="chip r">🩸 ${h(n)} hurt</span>`).join('')}${last.healed.map((n) => `<span class="chip g">✚ ${h(n)} healed</span>`).join('')}${last.deaths.map((n) => `<span class="chip dead">☠ ${h(n)} died</span>`).join('')}</div></div>` : ''}
         ${cur.react ? `<p class="react">${h(cur.react)}</p>` : ''}
         <p class="narr">${h(cur.text)}</p>
         ${cur.say.map((l) => { const c = party.find((p) => p.id === l.who); return `<div class="say">${avatarSVG(c.avatar, { size: 34 })}<div><b>${h(c.name)}</b><span>${h(l.text)}</span></div></div>`; }).join('')}
-        ${sel ? `<div class="selected panel"><div class="lbl">YOUR DECISION</div><p class="sl">${h(sel.label)}</p><p>${h(sel.desc)}</p>${riskHTML(sel.risk)}</div>` : `<div class="selected hint">Choose an option below, then press NEXT.</div>`}
+        ${sel ? `<div class="selected panel"><div class="lbl">${streamOn() ? 'CHAT\'S CHOICE' : 'YOUR DECISION'} · OPTION ${L(S.sel)}</div><p class="sl">${h(sel.label)}</p><p>${h(sel.desc)}</p>${riskHTML(sel.risk)}</div>` : `<div class="selected hint">${streamOn() ? 'Read the options out and let chat vote A–E in a poll. Tap the winner, then press NEXT.' : 'Choose an option below, then press NEXT.'}</div>`}
       </div>
       ${infectedBanner(g, a)}
-      <div class="choices">${cur.choices.map((c, i) => `<button class="choice ${S.sel === i ? 'on' : ''}" data-a="pick" data-i="${i}" aria-pressed="${S.sel === i}"><span class="num">${i + 1}</span><span class="cl">${c.special ? '<em class="unlock">★ Unlocked</em>' : ''}${h(c.label)}${riskHTML(c.risk)}</span></button>`).join('')}</div>
+      ${streamOn() ? `<div class="row gap stream-tools"><button class="btn small" data-a="copyOpts">📋 Copy options for chat</button></div>` : ''}
+      <div class="choices">${cur.choices.map((c, i) => `<button class="choice ${S.sel === i ? 'on' : ''}" data-a="pick" data-i="${i}" aria-pressed="${S.sel === i}" aria-label="Option ${L(i)}: ${h(c.label)}"><span class="num">${L(i)}</span><span class="cl">${c.special ? '<em class="unlock">★ Unlocked</em>' : ''}${h(c.label)}${riskHTML(c.risk)}</span></button>`).join('')}</div>
       <div class="playfoot">
         <button class="btn pack" data-a="openPack">🎒 Backpack${invCount ? `<span class="badge">${invCount}</span>` : ''}</button>
         <button class="btn next ${sel ? 'ready' : ''}" data-a="next" ${sel ? '' : 'disabled'}>NEXT ➜</button>
@@ -226,6 +263,7 @@ const SCREENS = {
         <div class="stat r"><b>${dd.length}</b><span>Deaths</span></div>
       </div>
       <div class="panel"><div class="lbl">THE TEAM</div><div class="end-roster">${g.party.map((c) => `<div class="end-char ${c.alive ? '' : 'dead'}"><div class="pic">${avatarSVG(c.avatar, { size: 56 })}${c.alive ? '' : '<div class="xmark">✕</div>'}</div><b>${h(c.name)}</b><span>${c.alive ? (c.infected && c.infected.resolved !== 'cured' ? 'Survived… infected' : hpLabel(c.hp)) : h(c.cause)}</span></div>`).join('')}</div></div>
+      ${streamOn() ? `<p class="center thanks">Thanks for playing, chat! 💜</p>` : ''}
       ${companionSummary(g, a).length ? `<div class="panel"><div class="lbl">COMPANIONS — THE TRUTH</div>${companionSummary(g, a).map((c) => `<div class="comp-row"><b>${h(c.name)}</b> <span class="chip ${c.loyalty === 'loyal' ? 'g' : c.loyalty === 'traitor' ? 'r' : ''}">${c.loyalty === 'loyal' ? '✔ Loyal' : c.loyalty === 'traitor' ? '☠ Traitor' : 'Ordinary'}</span> <small>${c.died ? h(c.cause || 'died') : c.stayed ? 'stayed to the end' : c.loyalty === 'traitor' ? 'betrayed the group' : 'went their own way'}</small></div>`).join('')}</div>` : ''}
       ${list('MAJOR DECISIONS', majors, (d) => `<b>Stage ${d.stage}:</b> ${h(d.choice)}`)}
       ${list('HEROIC MOMENTS', g.log.heroic.slice(0, 6), (d) => h(d.text))}
@@ -281,6 +319,43 @@ function infectedBanner(g, a) {
   }).join('');
 }
 
+// ---------------- streamer helpers ----------------
+async function copyText(text, ok) {
+  try { await navigator.clipboard.writeText(text); toast(ok); }
+  catch { modal('Copy this', `<textarea class="backup" readonly rows="7">${h(text)}</textarea>`, [{ label: 'Done' }]); }
+}
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener?.('release', () => { wakeLock = null; }); }
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch { wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && streamOn() && S.screen === 'play') keepAwake(true); });
+
+function overlay(html, cls, ms) {
+  return new Promise((resolve) => {
+    const el = document.createElement('div');
+    el.className = 'stream-overlay ' + cls;
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    const done = () => { if (!el.isConnected) return; el.remove(); resolve(); };
+    if (ms) setTimeout(done, ms);
+    else { el.addEventListener('click', done); const b = el.querySelector('button'); if (b) b.focus(); }
+  });
+}
+function deathCard(names) {
+  const dead = names.map((n) => S.game.party.find((p) => p.name === n && !p.alive)).filter(Boolean);
+  if (!dead.length) return Promise.resolve();
+  return overlay(`<div class="death-card panel">
+    <div class="dc-skull">☠</div>
+    <div class="dc-avs">${dead.map((c) => `<div class="pic">${avatarSVG(c.avatar, { size: dead.length > 2 ? 64 : 96 })}<div class="xmark">✕</div></div>`).join('')}</div>
+    <div class="dc-title">${dead.map((c) => h(c.name.toUpperCase())).join(' & ')} ${dead.length > 1 ? 'HAVE' : 'HAS'} FALLEN</div>
+    <p>${dead.map((c) => `${h(c.name)} ${h(c.cause || 'died')}.`).join(' ')}</p>
+    <p class="note">Press F in the chat 🕯️</p>
+    <button class="btn big">Continue ▶</button></div>`, 'dc');
+}
+
 function riskHTML(risk) {
   if (!risk || !risk.length) return '';
   return `<span class="risk">${risk.map((r) => `<em class="rk ${r.k}">${h(r.label)}</em>`).join('<i>·</i>')}</span>`;
@@ -316,6 +391,12 @@ const A = {
     modal('Add to Home Screen', `<ol class="install-steps">${steps.map(([ic, t], i) => `<li><span class="step-n">${i + 1}</span><span class="step-ic">${ic}</span><span>${t}</span></li>`).join('')}</ol><p class="note">The game then opens full screen from the zombie icon, like a normal app. Your characters are saved separately there, so use <b>Export</b> in the Character Library to bring them across.</p>`, [{ label: 'Got it', cls: 'green' }]);
   },
   go: (d) => go(d.to),
+  setMode(d) { S.settings.mode = d.m === 'stream' ? 'stream' : 'solo'; applySettings(); S.store?.setSettings(S.settings).catch(() => {}); render(); toast(streamOn() ? '📺 Streamer mode on.' : '🎮 Solo mode on.'); },
+  copyOpts() {
+    const g = S.game, cur = g.cur;
+    const text = `🧟 ${S.adv.title} · Stage ${g.stage}\n${cur.title}\nWhat should we do?\n` + cur.choices.map((c, i) => `${L(i)}) ${c.label}`).join('\n');
+    copyText(text, 'Options copied. Paste them into chat.');
+  },
   modalClose: () => closeModal(),
   modalBtn: (d) => { const b = S.modal.buttons[+d.i]; closeModal(); if (b.fn) b.fn(); },
   async continue() {
@@ -397,12 +478,21 @@ const A = {
     await save();
     go('play');
   },
-  pick(d) { S.sel = Number(d.i); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  pick(d) {
+    const i = Number(d.i); if (!S.game?.cur?.choices[i]) return;
+    S.sel = i;
+    const y = window.scrollY; render(); window.scrollTo(0, y);
+  },
   async next() {
     if (S.sel == null || S.busy) return;
     S.busy = true;
-    const before = S.game.party.filter((c) => c.alive).length;
-    try { choose(S.game, S.adv, S.sel); } catch (e) { console.error(e); toast('Something went wrong: ' + e.message); S.busy = false; return; }
+    const g = S.game, idx = S.sel, label = g.cur.choices[idx]?.label || '';
+    const before = g.party.filter((c) => c.alive).length;
+    if (streamOn()) {
+      await overlay(`<div class="drum"><div class="drum-l">CHAT CHOSE…</div><div class="drum-big">${L(idx)}</div><div class="drum-t">${h(label)}</div><div class="drum-dots">🥁 🥁 🥁</div></div>`, 'drumroll', 1700);
+    }
+    try { choose(g, S.adv, idx); } catch (e) { console.error(e); toast('Something went wrong: ' + e.message); S.busy = false; return; }
+    if (g.last) g.last.letter = L(idx);
     S.sel = null;
     await afterAdvance(before);
     S.busy = false;
@@ -470,6 +560,12 @@ async function save() {
 async function afterAdvance(aliveBefore) {
   const g = S.game;
   S.flash = g.party.filter((c) => c.alive).length < aliveBefore;
+  if (S.flash && streamOn()) {
+    const names = g.party.filter((c) => !c.alive && !(afterAdvance.seen || new Set()).has(c.id)).map((c) => c.name);
+    afterAdvance.seen = new Set(g.party.filter((c) => !c.alive).map((c) => c.id));
+    render();
+    await deathCard(names);
+  }
   if (g.finished) {
     try {
       S.replay = updateReplay(S.replay, g);
@@ -499,6 +595,8 @@ document.addEventListener('keydown', (e) => {
   if (S.screen !== 'play' || S.pack || S.modal) return;
   if (e.target.matches('input,textarea')) return;
   if (/^[1-5]$/.test(e.key)) A.pick({ i: Number(e.key) - 1 });
+  const li = 'abcde'.indexOf(e.key.toLowerCase());
+  if (e.key.length === 1 && li >= 0) A.pick({ i: li });
   if (e.key === 'Enter' && S.sel != null) A.next();
 });
 window.addEventListener('error', (e) => { console.error(e.error); });
