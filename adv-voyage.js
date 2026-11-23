@@ -1,5 +1,5 @@
 // ADVENTURE 3: THE LAST VOYAGE — infected cruise ship, escape and reach the mainland.
-import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue } from './kit.js';
+import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue, infectionEvents, roleEvents } from './kit.js';
 
 const A = 'voy';
 const E = (id, o) => ({ id: `${A}_${id}`, ...o });
@@ -840,19 +840,6 @@ const events = [
   }),
 
   // ---------------- TURN ----------------
-  E('turn', {
-    cat: 'turn', loc: '*', essential: true, repeat: true, title: `The Fever`, major: true,
-    text: [`{t} grips the railing, shaking. Their skin is grey, their eyes are bloodshot, and the scratch on their arm has turned black, with dark veins spreading toward the shoulder. Everyone knows what is happening.`],
-    scene: { light: 'dim' }, cast: ['t!', 'h?'], say: [['t', `"Just seasick. Just seasick, that is all."`], ['h', `"{t}... your arm."`]],
-    choices: [
-      C(`{t} stays behind on the ship`, `{t} chooses to protect the group.`, [O(1, 'neutral', `{t} hugs everyone, one by one, then walks back into the ship and closes a watertight door behind them. The bravest thing anyone has seen.`, [['kill', 't', 'sealed themselves inside the ship to protect the group from their infection', 'hero']])], { major: true }),
-      C(`Stay with {t} until the end`, `Nobody should be alone.`, [O(1, 'neutral', `{Team} stays. {t} talks about the holiday they meant to have. When it is over, the group carries on, smaller and quieter.`, [['kill', 't', 'lost to the infection, surrounded by friends'], ['time', -2]])]),
-      C(`Hide it and keep going`, `Maybe it will not get worse.`, [O(0.6, 'neutral', `{t} pulls down their sleeve. "I can make it to shore." Everyone pretends to believe it.`, [['conceal', 't']]), O(0.4, 'death', `It gets worse fast. {t} turns on {r} before anyone can react.`, [['kill', 't', 'turned from the infection'], ['hurt', 'r', 1]])]),
-      C(`Search the cabins for medicine`, `Someone must have something.`, [O(0.2, 'good', `In a first-class suite: a private doctor's bag with antivirals. {t}'s fever begins to break.`, [['cure'], ['time', -2], ['hero']]), O(0.8, 'neutral', `Nothing. {t} insists on carrying on.`, [['conceal', 't'], ['time', -2]])]),
-      C(`Let {t} decide`, `It is their life.`, [O(0.5, 'neutral', `{t} decides to keep going. "Get me to land. They will have doctors."`, [['conceal', 't']]), O(0.5, 'neutral', `{t} decides to stay. "Look after each other." And they are gone.`, [['kill', 't', 'chose to stay aboard when the infection took hold', 'hero']])]),
-    ],
-    uses: { cure: U(`Dr Anand's antiviral goes in. {t} shudders, sweats, sleeps. When they wake, the dark veins are fading. It worked.`, [['cure'], ['hero']]) },
-  }),
 
   // ---------------- TIMEOUT ----------------
   E('timeout', {
@@ -949,7 +936,8 @@ export default {
   targetStages: 32, maxStages: 40,
   finale: [`${A}_fin_launch`, `${A}_fin_crossing`], finaleLoc: 'sea',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
-  turnEvent: `${A}_turn`, timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`, turnDelay: 4,
+  turnEvent: `${A}_inf_turned`, revealEvent: `${A}_inf_reveal`, cureItem: 'antiviral', timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`,
+  startKit: { easy: [['fire_axe'], ['pistol', 2], ['first_aid'], ['bandages', 2], ['flashlight']], medium: [['bandages', 1], ['flashlight', 2]], hard: [] },
   npcs: {
     bruno: { name: `Chef Bruno`, traitor: 0.07, loyal: 0.7, skin: '#eeb48b', hair: '#1c1b20', hat: 'chef', shirt: '#f7f7fa', legs: '#2b2d42', extra: 'apron', beard: '#1c1b20' },
     delphine: { name: `Delphine`, traitor: 0.15, loyal: 0.5, skin: '#734125', hair: '#1c1b20', style: 'long', shirt: '#e468a8', extra: 'gown' },
@@ -961,7 +949,7 @@ export default {
     passenger: { name: `the passenger`, traitor: 0.2, loyal: 0.4, skin: '#c98552', hair: '#6b3e1f', style: 'long', shirt: '#f77f00', legs: '#2b2d42' },
     mime: { name: `the mime`, traitor: 0.25, loyal: 0.4, skin: '#f7f7fa', style: 'bald', hat: 'cap', hatC: '#1b1b22', shirt: '#1b1b22', legs: '#1b1b22', extra: 'stripes' },
   },
-  items, locations, events: [...events, ...companionEvents(A)], defaultLoot: ['bandages', 'canapes', 'lifejackets', 'batteries'],
+  items, locations, events: [...events, ...companionEvents(A), ...infectionEvents(A, { weaponWord: 'an axe, knife or gun' }), ...roleEvents(A, { weapon: 'fire_axe', medical: 'bandages', light: 'flashlight', junk: 'ship fittings' })], defaultLoot: ['bandages', 'canapes', 'lifejackets', 'batteries'],
   travelText: [`{loc} is behind {team} now. Three ways lead aft toward the lifeboats. The ship sinks in {clock}.`, `Time to leave {loc}. Which way now? {clock} before the Aurora Star goes under.`, `The deck is tilting a little more. Three routes on from {loc}, and {clock} left.`, `A long groan runs through the hull. {clock} before the sea takes her. Which way?`, `Water is creeping up the stairwells. {clock} left. Pick a route from {loc}.`],
   travelSay: [['a', [`"Which way? Quickly."`, `"Pick a route. The water is rising."`, `"Aft. Lifeboats are aft. Which way is aft?"`]]],
   travelOutcomes: T,

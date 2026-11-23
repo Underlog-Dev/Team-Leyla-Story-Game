@@ -1,5 +1,6 @@
 // Character data: creation, validation, export and import. Pure functions.
-import { normaliseAvatar, randomAvatar, TRAITS } from './avatar.js';
+import { normaliseAvatar, randomAvatar, TRAITS, ROLE_LIST } from './avatar.js';
+import { hashSeed } from './rng.js';
 
 export const MAX_CHARACTERS = 20;
 export const MAX_TRAITS = 3;
@@ -13,11 +14,20 @@ export function cleanName(n) {
   return String(n || '').replace(/[\u0000-\u001f<>{}]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18);
 }
 
-export function makeCharacter({ name, avatar, traits = [], description = '', id, created } = {}) {
+// Older characters had roles mixed into their tags; pick a sensible role for them.
+export function guessRole(traits = [], key = '') {
+  const map = { Medic: 'Medic', Engineer: 'Engineer', Leader: 'Leader', Brave: 'Fighter', 'Nature lover': 'Scout', Reckless: 'Athlete', Practical: 'Engineer', Intelligent: 'Medic', Gamer: 'Fighter' };
+  for (const t of traits) if (map[t]) return map[t];
+  return ROLE_LIST[hashSeed(String(key)) % ROLE_LIST.length];
+}
+
+export function makeCharacter({ name, avatar, traits = [], role, description = '', id, created } = {}) {
+  const cid = id || newId();
   return {
-    id: id || newId(),
+    id: cid,
     name: cleanName(name) || 'Survivor',
     avatar: normaliseAvatar(avatar),
+    role: ROLE_LIST.includes(role) ? role : guessRole(traits || [], cid),
     traits: [...new Set((traits || []).filter((t) => TRAITS.includes(t)))].slice(0, MAX_TRAITS),
     description: String(description || '').replace(/[<>{}]/g, '').slice(0, 160),
     created: created || Date.now(),
@@ -39,7 +49,8 @@ export function randomCharacter(existingNames = [], rand = Math.random) {
   const tr = [];
   const n = 1 + Math.floor(rand() * 2);
   for (let i = 0; i < n && pool.length; i++) tr.push(pool.splice(Math.floor(rand() * pool.length) % pool.length, 1)[0]);
-  return makeCharacter({ name, avatar: randomAvatar(rand), traits: tr });
+  const role = ROLE_LIST[Math.floor(rand() * ROLE_LIST.length) % ROLE_LIST.length];
+  return makeCharacter({ name, avatar: randomAvatar(rand), traits: tr, role });
 }
 
 export function exportLibrary(list) {
@@ -68,4 +79,19 @@ export function mergeLibrary(existing, incoming, mode = 'merge') {
     else dropped++;
   }
   return { list: [...byId.values()], added, updated, dropped };
+}
+
+// A ready-made crew for players who just want to jump in.
+export const STARTER_CREW = [
+  { name: 'Mo', role: 'Medic', traits: ['Kind', 'Nervous'], description: 'Night-shift nurse. Has seen worse. Probably.', avatar: { skin: 6, hair: 3, hairColour: 0, eyes: 0, eyeColour: 0, mouth: 0, beard: 2, stache: 0, facialColour: 0, eyewear: 1, hat: 0, hatColour: 0, acc: 7, bg: 5 } },
+  { name: 'Bex', role: 'Engineer', traits: ['Sarcastic', 'Practical'], description: 'Can fix anything with tape and swearing.', avatar: { skin: 1, hair: 8, hairColour: 4, eyes: 7, eyeColour: 2, mouth: 4, beard: 0, stache: 0, facialColour: 4, eyewear: 5, hat: 0, hatColour: 4, acc: 4, bg: 2 } },
+  { name: 'Tank', role: 'Fighter', traits: ['Brave', 'Loyal'], description: 'Ex-bouncer. Has a soft spot for dogs.', avatar: { skin: 8, hair: 0, hairColour: 0, eyes: 5, eyeColour: 0, mouth: 1, beard: 2, stache: 0, facialColour: 0, eyewear: 3, hat: 0, hatColour: 3, acc: 2, bg: 3 } },
+  { name: 'Skye', role: 'Scout', traits: ['Nature lover', 'Mysterious'], description: 'Always somehow knows the way.', avatar: { skin: 3, hair: 7, hairColour: 5, eyes: 0, eyeColour: 1, mouth: 4, beard: 0, stache: 0, facialColour: 5, eyewear: 0, hat: 8, hatColour: 2, acc: 0, bg: 1 } },
+  { name: 'Captain Jo', role: 'Leader', traits: ['Brave', 'Practical'], description: 'Ran a Scout troop for twenty years. Nothing scares her.', avatar: { skin: 0, hair: 6, hairColour: 7, eyes: 5, eyeColour: 4, mouth: 1, beard: 0, stache: 0, facialColour: 7, eyewear: 1, hat: 1, hatColour: 1, acc: 0, bg: 9 } },
+  { name: 'Zippy', role: 'Athlete', traits: ['Funny', 'Reckless'], description: 'Marathon runner. Will not stop talking about it.', avatar: { skin: 4, hair: 3, hairColour: 1, eyes: 4, eyeColour: 3, mouth: 2, beard: 0, stache: 0, facialColour: 1, eyewear: 0, hat: 5, hatColour: 0, acc: 5, bg: 11 } },
+  { name: 'Dex', role: 'Fighter', traits: ['Gamer', 'Funny'], description: 'Has played every zombie game. Thinks this is one.', avatar: { skin: 2, hair: 11, hairColour: 10, eyes: 7, eyeColour: 5, mouth: 4, beard: 0, stache: 0, facialColour: 1, eyewear: 0, hat: 10, hatColour: 7, acc: 0, bg: 4 } },
+  { name: 'Nana Pat', role: 'Medic', traits: ['Kind', 'Foodie'], description: 'Retired midwife. Carries biscuits at all times.', avatar: { skin: 1, hair: 12, hairColour: 8, eyes: 4, eyeColour: 1, mouth: 0, beard: 0, stache: 0, facialColour: 8, eyewear: 1, hat: 0, hatColour: 5, acc: 5, bg: 8 } },
+];
+export function starterCrew(existingNames = []) {
+  return STARTER_CREW.filter((c) => !existingNames.includes(c.name)).map((c, i) => makeCharacter({ ...c, id: 'c_starter_' + c.name.toLowerCase().replace(/[^a-z]/g, ''), created: Date.now() + i }));
 }

@@ -1,5 +1,5 @@
 // ADVENTURE 2: DEADWOOD FOREST — wilderness outbreak, reach the ranger station beacon.
-import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue } from './kit.js';
+import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue, infectionEvents, roleEvents } from './kit.js';
 
 const A = 'dwf';
 const E = (id, o) => ({ id: `${A}_${id}`, ...o });
@@ -860,19 +860,6 @@ const events = [
   }),
 
   // ---------------- TURN ----------------
-  E('turn', {
-    cat: 'turn', loc: '*', essential: true, repeat: true, title: `The Fever`, major: true,
-    text: [`{t} sits down on a log and cannot get back up. Their skin is grey and wet with sweat. The scratch has turned black, and dark lines are crawling up their arm. Everyone knows what this means.`],
-    scene: { light: 'dim' }, cast: ['t!', 'h?'], say: [['t', `"Just give me a minute. I am fine."`], ['h', `"{t}... your arm."`]],
-    choices: [
-      C(`{t} walks into the forest alone`, `{t} chooses to protect the group.`, [O(1, 'neutral', `{t} hugs everyone, then walks into the trees without looking back. The bravest thing anyone has seen.`, [['kill', 't', 'walked into the forest alone to protect the group from their infection', 'hero']])], { major: true }),
-      C(`Stay with {t} until the end`, `Nobody should be alone.`, [O(1, 'neutral', `They stay. {t} talks about home. When it is over, the group carries on, smaller and quieter.`, [['kill', 't', 'lost to the infection, surrounded by friends'], ['time', -2]])]),
-      C(`Hide it and keep going`, `Maybe it will not get worse.`, [O(0.6, 'neutral', `{t} pulls down their sleeve. "I can make it to the station." Everyone pretends to believe it.`, [['conceal', 't']]), O(0.4, 'death', `It gets worse fast. {t} turns on {r} before anyone can react.`, [['kill', 't', 'turned from the infection'], ['hurt', 'r', 1]])]),
-      C(`Search for medicinal plants`, `Hazel said there were herbs for everything.`, [O(0.2, 'good', `Willow bark and something bitter. The fever breaks. Against all odds, {t} improves.`, [['cure'], ['time', -2], ['hero']]), O(0.8, 'neutral', `Nothing works. {t} insists on carrying on.`, [['conceal', 't'], ['time', -2]])]),
-      C(`Let {t} decide`, `It is their life.`, [O(0.5, 'neutral', `{t} decides to keep going. "Get me to that helicopter. They will have medicine."`, [['conceal', 't']]), O(0.5, 'neutral', `{t} decides to go alone. "Look after each other." And they are gone.`, [['kill', 't', 'chose to leave the group when the infection took hold', 'hero']])]),
-    ],
-    uses: { cure: U(`The autoinjector clicks. {t} gasps, shakes, sleeps. When they wake, the black lines are fading. It worked.`, [['cure'], ['hero']]) },
-  }),
 
   // ---------------- TIMEOUT ----------------
   E('timeout', {
@@ -965,7 +952,8 @@ export default {
   targetStages: 32, maxStages: 40,
   finale: [`${A}_fin_approach`, `${A}_fin_beacon`], finaleLoc: 'station',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
-  turnEvent: `${A}_turn`, timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`, turnDelay: 4,
+  turnEvent: `${A}_inf_turned`, revealEvent: `${A}_inf_reveal`, cureItem: 'antidote', timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`,
+  startKit: { easy: [['hatchet'], ['rifle', 2], ['first_aid'], ['bandages', 2], ['flashlight']], medium: [['bandages', 1], ['trail_mix', 1]], hard: [] },
   npcs: {
     pemberton: { name: `Pemberton`, traitor: 0.08, loyal: 0.6, hair: '#9b9aa3', hat: 'wide', hatC: '#8a7a4a', shirt: '#8a7a4a', legs: '#5c4b3b' },
     wade: { name: `Wade`, traitor: 0.45, loyal: 0.25, skin: '#dc9c6e', hair: '#3b2417', hat: 'cap', hatC: '#f77f00', shirt: '#5b6b2f', legs: '#3d4f22', beard: '#3b2417' },
@@ -976,7 +964,7 @@ export default {
     joan: { name: `Joan`, traitor: 0.04, loyal: 0.7, skin: '#f8cba6', hair: '#ecebf2', style: 'bun', shirt: '#7d4cc9', legs: '#2b2d42' },
     rambler: { name: `the rambler`, traitor: 0.1, loyal: 0.5, skin: '#eeb48b', hair: '#9b9aa3', hat: 'wide', hatC: '#7d4cc9', shirt: '#7d4cc9', legs: '#2b2d42' },
   },
-  items, locations, events: [...events, ...companionEvents(A)], defaultLoot: ['bandages', 'trail_mix', 'berries', 'batteries'],
+  items, locations, events: [...events, ...companionEvents(A), ...infectionEvents(A, { weaponWord: 'a hatchet or rifle' }), ...roleEvents(A, { weapon: 'hatchet', medical: 'bandages', light: 'flashlight', junk: 'camping gear' })], defaultLoot: ['bandages', 'trail_mix', 'berries', 'batteries'],
   travelText: [`{loc} is behind {team} now. Three ways lead on toward the ranger station. {clock} until the forest is overrun.`, `Time to leave {loc}. Which way now? The horde reaches this valley in {clock}.`, `The trees are thinning. Three paths onward from {loc}, and {clock} before the horde arrives.`, `Somewhere behind, thousands of feet are moving. {clock} left. Which path from {loc}?`, `The radio mast is still a long way east. {clock} on the clock. Pick a path.`],
   travelSay: [['a', [`"Which way? Quickly."`, `"Pick a path. We cannot stay."`, `"East. Which way is east?"`]]],
   travelOutcomes: T,

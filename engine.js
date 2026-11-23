@@ -1,8 +1,28 @@
 // Branching story engine. Pure logic: no DOM. All randomness flows through the
 // seeded Rng whose state lives in the game state, so saves resume exactly.
 import { Rng, hashSeed } from './rng.js';
+import { POOL } from './kit.js';
 
 export const MAX_HP = 3;
+export const MAX_PARTY = 6;
+
+export const ROLES = {
+  Medic: 'Healing items heal 1 extra. Can sometimes save someone from dying of their wounds.',
+  Engineer: 'Unlocks repair and build options. Fewer injuries from hazards.',
+  Fighter: 'When zombies attack, deaths and infections are less likely.',
+  Scout: 'Finds items more often when searching.',
+  Leader: 'Keeps the group calm: noise builds up more slowly.',
+  Athlete: 'Harder to catch: much less likely to be bitten when attacked.',
+};
+
+export const DIFFICULTY = {
+  easy: { label: 'Easy', danger: 0.85, death: 0.75, item: 1.25, clock: 10, infect: 6, cureFind: 0.24, ambient: 0.04, blurb: 'Enjoy the story. Start with weapons and supplies, more time, gentler odds, cures easier to find. People can still die.' },
+  medium: { label: 'Medium', danger: 1, death: 1, item: 1, clock: 0, infect: 6, cureFind: 0.14, ambient: 0.06, blurb: 'The intended challenge. A few basics to start with.' },
+  hard: { label: 'Hard', danger: 1.45, death: 1.9, item: 0.7, clock: -8, infect: 6, cureFind: 0.07, ambient: 0.13, blurb: 'Brutal. An empty backpack, less time, cures are rare. Possible, barely.' },
+};
+const diffOf = (s) => DIFFICULTY[s.diff] || DIFFICULTY.medium;
+export function infectDelay(s) { return diffOf(s).infect; }
+const hasRole = (s, role) => alive(s).some((c) => c.role === role);
 export const SPECIAL_CATS = new Set(['emergency', 'finale', 'turn', 'timeout', 'chain', 'opening', 'travel']);
 const BAD_KINDS = new Set(['hurt', 'danger', 'death', 'infect']);
 
@@ -35,13 +55,15 @@ export function progressOf(s, adv) {
 }
 
 // ---------- new game ----------
-export function newGame(adv, characters, seed, { replay = null, useReplay = true } = {}) {
+export function newGame(adv, characters, seed, { replay = null, useReplay = true, difficulty = 'medium' } = {}) {
   if (!characters.length) throw new Error('Select at least one character');
+  characters = characters.slice(0, MAX_PARTY);
   const s = {
     v: 1, adv: adv.id, seed, rng: hashSeed(seed + ':' + adv.id), stage: 1,
-    party: characters.map((c) => ({ id: c.id, name: c.name, avatar: c.avatar, traits: c.traits || [], hp: MAX_HP, alive: true, involve: 0, danger: 0, infected: null, cause: null, diedAt: null })),
+    party: characters.map((c) => ({ id: c.id, name: c.name, avatar: c.avatar, role: c.role || null, traits: [...(c.role ? [c.role] : []), ...(c.traits || [])], hp: MAX_HP, alive: true, involve: 0, danger: 0, infected: null, cause: null, diedAt: null })),
     inv: [], flags: {}, npcs: [], loc: adv.zones[0][0], zone: 0, zoneStages: 0, zoneQuota: adv.zoneQuota ? adv.zoneQuota[0][0] : 3,
-    clock: adv.clock.start, seen: [], pending: [], cur: null, last: null, lastCat: null, lastEm: null, recentDeaths: [],
+    diff: DIFFICULTY[difficulty] ? difficulty : 'medium', heat: 0,
+    clock: adv.clock.start + (DIFFICULTY[difficulty]?.clock || 0), seen: [], pending: [], cur: null, last: null, lastCat: null, lastEm: null, recentDeaths: [],
     log: { decisions: [], discoveries: [], itemsUsed: [], funny: [], heroic: [], deaths: [], locations: [adv.zones[0][0]] },
     finished: false, ending: null, phase: 'normal', rw: {}, started: Date.now(), npcData: {},
   };
@@ -50,6 +72,7 @@ export function newGame(adv, characters, seed, { replay = null, useReplay = true
   // zone quotas decided by the seed
   s.quotas = adv.zones.map((z, i) => { const q = adv.zoneQuota?.[i] || [3, 5]; return r.range(q[0], q[1]); });
   s.zoneQuota = s.quotas[0];
+  for (const [id, q] of (adv.startKit?.[s.diff] || [])) { const d = adv.items[id]; if (d) s.inv.push({ id, qty: q || d.qty || 1 }); }
   const opening = r.weighted(adv.events.filter((e) => e.cat === 'opening' && reqOK(s, adv, e.req) && castable(s, e)), (e) => (e.w || 1) * (s.rw[e.id] ?? 1));
   s.pending.push({ id: opening.id });
   nextStage(s, adv, true);
@@ -190,14 +213,36 @@ export function spread(s) { const n = alive(s).length; return { hurt: Math.max(0
 
 export function effectiveOutcomes(s, adv, outcomes, ev) {
   const os = outcomes.map((o) => ({ ...o }));
-  if (ev && (ev.cat === 'finale' || ev.cat === 'timeout' || ev.cat === 'turn' || ev.noScale)) return os;
-  const B = os.filter((o) => BAD_KINDS.has(o.k)).reduce((a, o) => a + o.p, 0);
+  const D = diffOf(s);
+  const fixed = ev && (ev.cat === 'finale' || ev.cat === 'timeout' || ev.cat === 'turn' || ev.noScale);
+  // per-kind multipliers from difficulty, noise and the team's roles
+  const base = fixed ? 0.75 + 0.25 * D.danger : dangerScale(s, adv) * D.danger;
+  const m = { hurt: base, danger: base, infect: base, death: base * D.death };
+  const em = ev && ev.cat === 'emergency';
+  if (em && hasRole(s, 'Fighter')) { m.death *= 0.65; m.infect *= 0.65; m.hurt *= 0.85; }
+  if (em) { const t = charById(s, s.cur?.cast?.t || ''); if (t && t.alive && t.role === 'Athlete') m.death *= 0.5; }
+  if (ev && ev.cat === 'hazard' && hasRole(s, 'Engineer')) m.hurt *= 0.75;
+  let itemMul = D.item * (hasRole(s, 'Scout') ? 1.25 : 1);
   const T = os.reduce((a, o) => a + o.p, 0);
-  if (B <= 0 || B >= T) return os;
-  const f = dangerScale(s, adv);
-  const nb = Math.min(B * f, T * 0.92);
-  const scaleBad = nb / B, scaleGood = (T - nb) / (T - B);
-  for (const o of os) o.p = o.p * (BAD_KINDS.has(o.k) ? scaleBad : scaleGood);
+  for (const o of os) { if (BAD_KINDS.has(o.k)) o.p *= m[o.k]; else if (o.k === 'item') o.p *= itemMul; }
+  // renormalise: keep the bad share (capped), share the rest among the good outcomes
+  const B0 = outcomes.filter((o) => BAD_KINDS.has(o.k)).reduce((a, o) => a + o.p, 0);
+  let B = os.filter((o) => BAD_KINDS.has(o.k)).reduce((a, o) => a + o.p, 0);
+  const G = os.filter((o) => !BAD_KINDS.has(o.k)).reduce((a, o) => a + o.p, 0);
+  if (B > T * 0.92) { const k = (T * 0.92) / B; for (const o of os) if (BAD_KINDS.has(o.k)) o.p *= k; B = T * 0.92; }
+  if (G > 0) { const k = (T - B) / G; for (const o of os) if (!BAD_KINDS.has(o.k)) o.p *= k; }
+  else if (B > 0) { const k = T / B; for (const o of os) o.p *= k; }
+  void B0;
+  if (fixed) return os;
+  // ambient danger: no path is ever completely safe, and it grows over the story
+  if (!em && ev && ev.cat !== 'chain') {
+    const amb = (D.ambient || 0) * (0.6 + 0.8 * progressOf(s, adv)) * (hasRole(s, 'Leader') ? 0.8 : 1);
+    if (amb > 0) {
+      const tot = os.reduce((a, o) => a + o.p, 0);
+      for (const o of os) o.p *= (tot - amb * tot) / tot;
+      os.push({ p: amb * tot, k: 'danger', t: POOL.danger, fx: [['em', 'r']], ambient: true });
+    }
+  }
   // grace period: outright deaths are much rarer in the opening stages
   if (s.stage <= (adv.graceStages ?? 6)) {
     let moved = 0;
@@ -237,7 +282,7 @@ function pickChoices(s, adv, e, cast = {}) {
 function renderEvent(s, adv, e, cast) {
   const r = rngOf(s);
   // trait-specific choice performer
-  for (const c of e.choices) {
+  for (const c of [...e.choices, { req: e.req }]) {
     if (c.req?.trait && !cast.x) {
       const cands = alive(s).filter((ch) => hasTrait(ch, c.req.trait));
       if (cands.length) cast.x = (cands.find((ch) => Object.values(cast).includes(ch.id)) || r.pick(cands)).id;
@@ -263,7 +308,7 @@ function renderEvent(s, adv, e, cast) {
   if (!s.recentDeaths.length && e.cat !== 'emergency' && e.cat !== 'finale' && e.cat !== 'turn' && adv.quips && r.chance(adv.quipRate ?? 0.33)) {
     const al = alive(s);
     if (al.length) {
-      const sp = r.weighted(al, (c) => 1 / (1 + c.involve));
+      const sp = r.weighted(al, (c) => (1 / (1 + c.involve)) * (['Funny', 'Sarcastic', 'Gamer', 'Reckless'].some((t) => hasTrait(c, t)) ? 3 : (c.traits || []).length > (c.role ? 1 : 0) ? 1.5 : 1));
       const keys = (sp.traits || []).filter((t) => adv.quips[t]);
       const pool = keys.length && r.chance(0.75) ? adv.quips[r.pick(keys)] : adv.quips.Any;
       if (pool && pool.length) {
@@ -294,7 +339,7 @@ function renderEvent(s, adv, e, cast) {
     const trust = c.o.some((o) => o.loyalty);
     const sp = spread(s);
     const tag = (rk) => rk.map((x) => (x.k === 'hurt' && sp.hurt >= 0.5 ? { ...x, label: x.label + ' (several)' } : x.k === 'danger' && sp.em >= 0.5 ? { ...x, label: x.label + ' (more may come)' } : x));
-    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : tag(riskSummary(os)), special: !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion)) };
+    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : tag(riskSummary(os)), special: !!c.badge || !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion)) };
   });
   const loc = adv.locations[s.loc];
   const sc = e.scene || {};
@@ -323,14 +368,19 @@ function travelEvent(s, adv) {
 function chooseNextEvent(s, adv) {
   const r = rngOf(s);
   // infection turning
-  const inf = alive(s).find((c) => c.infected && !c.infected.resolved && s.stage >= c.infected.at + (adv.turnDelay || 4));
-  if (inf && adv.turnEvent) { inf.infected.resolved = 'pending'; return { e: eventById(adv, adv.turnEvent), given: { t: inf.id } }; }
+  const inf = alive(s).find((c) => c.infected && (c.infected.resolved === false || c.infected.resolved === 'restrained') && s.stage >= c.infected.at + infectDelay(s));
+  if (inf) {
+    if (alive(s).length === 1) { die(s, inf, 'turned into one of the infected', { deaths: [], adv }); s.flags._end = true; return { e: eventById(adv, adv.fillerEvent), given: {} }; }
+    s.pending = s.pending.filter((p) => !(p.id === adv.revealEvent && p.cast?.t === inf.id));
+    return { e: eventById(adv, adv.turnEvent), given: { t: inf.id } };
+  }
   if (s.phase === 'normal' && s.stage >= (adv.maxStages || 40) - adv.finale.length + 1) s.pending = s.pending.filter((p) => eventById(adv, p.id)?.cat === 'turn');
   while (s.pending.length) {
     const p = s.pending.shift();
     const e = eventById(adv, p.id);
     if (!e) continue;
     if (e.req && !reqOK(s, adv, e.req) && e.cat !== 'finale') continue;
+    if (e.id === adv.revealEvent) { const t = charById(s, p.cast?.t); if (!t || !t.alive || !t.infected || t.infected.resolved) continue; }
     return { e, given: p.cast || {} };
   }
   if (s.clock <= 0 && !s.flags._timeout && adv.timeoutEvent) { s.flags._timeout = true; s.phase = 'timeout'; return { e: eventById(adv, adv.timeoutEvent), given: {} }; }
@@ -381,6 +431,7 @@ function nextStage(s, adv, first = false) {
   if (s.flags._end) return finish(s, adv);
   for (let guard = 0; guard < 20; guard++) {
     const { e, given } = chooseNextEvent(s, adv);
+    if (s.flags._end || !alive(s).length) return finish(s, adv);
     const cast = castEvent(s, e, given);
     if (!cast) { if (e.cat === 'finale') return finish(s, adv); continue; }
     if (!e._travel) s.seen.push(e.id);
@@ -471,15 +522,24 @@ function applyFx(s, adv, fx, ctx) {
           const others = r.shuffle(alive(s).filter((c) => c !== targets[0]));
           while (extra-- > 0 && others.length) { const o = others.pop(); targets.push(o); ctx.extraHurt.push(o.id); }
         }
-        for (const c of targets) { c.hp -= a2 || 1; c.danger++; ctx.hurt.push(c.id); if (c.hp <= 0) die(s, c, a3 || 'succumbed to their injuries', ctx); }
+        for (const c of targets) {
+          c.hp -= a2 || 1; c.danger++; ctx.hurt.push(c.id);
+          if (c.hp <= 0) {
+            const medic = alive(s).find((x) => x.role === 'Medic' && x !== c);
+            if (medic && r.chance(0.45)) { c.hp = 1; ctx.saved = (ctx.saved || []).concat(`${medic.name} keeps ${c.name} alive with some desperate first aid.`); }
+            else die(s, c, a3 || 'succumbed to their injuries', ctx);
+          }
+        }
         break;
       }
       case 'heal': for (const c of pickTarget(s, a1 || 'injured', ctx)) { c.hp = Math.min(MAX_HP, c.hp + (a2 || 1)); ctx.healed.push(c.id); } break;
       case 'bite': for (const c of pickTarget(s, a1, ctx)) die(s, c, 'bitten by the infected', ctx); break;
       case 'kill': for (const c of pickTarget(s, a1, ctx)) { if (a3 === 'hero') { s.flags.sacrifice = true; s.log.heroic.push({ stage: s.stage, text: `${c.name} ${a2}` }); } die(s, c, a2, ctx); } break;
-      case 'infect': for (const c of pickTarget(s, a1, ctx)) { if (!c.infected) { c.infected = { at: s.stage, resolved: false }; c.danger++; } } break;
+      case 'infect': for (const c of pickTarget(s, a1, ctx)) { if (!c.infected) { c.infected = { at: s.stage, resolved: false }; c.danger++; if (adv.revealEvent) s.pending.push({ id: adv.revealEvent, cast: { t: c.id } }); } } break;
+      case 'restrain': for (const c of pickTarget(s, a1, ctx)) if (c.infected && !c.infected.resolved) c.infected.resolved = 'restrained'; break;
+      case 'useany': { const it = s.inv.find((i) => (adv.items[i.id]?.tags || []).some((t) => arr(a1).includes(t))); if (it) { s.log.itemsUsed.push({ stage: s.stage, item: it.id, name: adv.items[it.id].name }); consume(s, it.id, 1); } break; }
       case 'cure': for (const c of alive(s)) { if (c.infected && c.infected.resolved !== 'cured') c.infected = { ...c.infected, resolved: 'cured' }; } break;
-      case 'conceal': for (const c of pickTarget(s, a1, ctx)) { if (c.infected) c.infected.resolved = 'concealed'; s.flags.concealed = true; } break;
+      case 'conceal': break;
       case 'em': {
         const tgt = pickTarget(s, a1 || 'r', ctx)[0];
         if (tgt) {
@@ -515,20 +575,29 @@ function applyFx(s, adv, fx, ctx) {
 }
 
 function resolveOutcome(s, adv, ev, o, label) {
+  const r = rngOf(s);
   const ctx = { cast: { ...s.cur.cast }, deaths: [], hurt: [], healed: [], gained: [], lost: [], extraHurt: [], adv, resolving: true, npcId: s.cur.npc, npc: s.cur.npc ? npcName(adv, s.cur.npc) : undefined };
   applyFx(s, adv, o.fx, ctx);
   let text = fill(s, adv, o.t, ctx);
+  if (ctx.saved) text += ' ' + ctx.saved.join(' ');
+  // while someone is infected, the team might stumble on a cure
+  const sick = alive(s).filter((c) => c.infected && c.infected.resolved === false && c.infected.at < s.stage);
+  if (sick.length && adv.cureItem && !hasItem(s, adv.cureItem) && r.chance(diffOf(s).cureFind)) {
+    const finder = r.pick(alive(s).filter((c) => !sick.includes(c)).length ? alive(s).filter((c) => !sick.includes(c)) : alive(s));
+    addItem(s, adv, adv.cureItem, 1, ctx);
+    text += ` And then a stroke of luck: ${finder.name} finds a ${adv.items[adv.cureItem].name}! Use it from the backpack to save ${sick[0].name}.`;
+  }
   if (ctx.extraHurt.length) { const n = ctx.extraHurt.map((id) => nameOf(s, id)); text += ` In the chaos, ${listNames(n)} ${n.length > 1 ? 'are' : 'is'} hurt too.`; }
   if (ctx.wave) text += ` And ${ctx.wave > 1 ? 'more of them are' : 'another one is'} coming.`;
   // noise: bad outcomes draw more infected; quiet choices let it settle
   const bad = ['hurt', 'danger', 'death', 'infect'].includes(o.k);
-  s.heat = Math.max(0, Math.min(MAX_HEAT, (s.heat || 0) + (bad ? (o.k === 'danger' ? 1.5 : 1) : -0.75)));
+  const calm = hasRole(s, 'Leader') ? 0.55 : 1;
+  s.heat = Math.max(0, Math.min(MAX_HEAT, (s.heat || 0) + (bad ? (o.k === 'danger' ? 1.5 : 1) * calm : -0.75)));
   if (ctx.funny) s.log.funny.push({ stage: s.stage, text });
   if (ctx.hero) s.log.heroic.push({ stage: s.stage, text });
   const major = ev && (['moral', 'rescue', 'finale', 'timeout', 'turn', 'emergency', 'travel'].includes(ev.cat) || ev.major);
   s.log.decisions.push({ stage: s.stage, event: s.cur.id, title: s.cur.title, choice: label, result: text, major: !!major });
   s.last = { choice: label, text, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), kind: o.k };
-  if (s.cur.cat === 'turn') { for (const c of s.party) if (c.infected && c.infected.resolved === 'pending') c.infected.resolved = c.alive ? 'concealed' : 'dead'; }
   s.clock -= 1;
   s.zoneStages++;
   const wasFinale = ev && ev.cat === 'finale';
@@ -576,7 +645,7 @@ export function useItem(s, adv, itemId) {
   if (d.anytime === 'heal') {
     const inj = alive(s).filter((c) => c.hp < MAX_HP).sort((a, b) => a.hp - b.hp)[0];
     if (!inj) return { ok: false, msg: 'Nobody needs patching up right now. Save it for later.' };
-    inj.hp = Math.min(MAX_HP, inj.hp + (d.heal || 1));
+    inj.hp = Math.min(MAX_HP, inj.hp + (d.heal || 1) + (hasRole(s, 'Medic') ? 1 : 0));
     consume(s, itemId, 1);
     s.log.itemsUsed.push({ stage: s.stage, item: itemId, name: d.name });
     return { ok: true, advanced: false, msg: `${inj.name} is patched up (${inj.hp}/${MAX_HP} health).` };
@@ -601,6 +670,20 @@ export function useItem(s, adv, itemId) {
   return { ok: false, msg: 'This item cannot be used in this situation.' };
 }
 
+export function mercyKill(s, adv, charId) {
+  const c = charById(s, charId);
+  if (!c || !c.alive || !c.infected || ['cured', 'dead'].includes(c.infected.resolved)) return { ok: false, msg: 'Nobody here needs that.' };
+  const it = s.inv.find((i) => (adv.items[i.id]?.tags || []).some((t) => t === 'melee' || t === 'gun'));
+  if (!it) return { ok: false, msg: 'You need a weapon to do that.' };
+  s.log.itemsUsed.push({ stage: s.stage, item: it.id, name: adv.items[it.id].name });
+  consume(s, it.id, 1);
+  die(s, c, 'was put down by the group before the infection could take hold', { deaths: [], adv });
+  c.infected.resolved = 'dead';
+  s.log.decisions.push({ stage: s.stage, event: 'mercy', title: 'Infected', choice: `Put ${c.name} down`, result: `${c.name} was put down before they could turn.`, major: true });
+  if (!alive(s).length) finish(s, adv);
+  return { ok: true, msg: `${c.name} is gone. It was quick.` };
+}
+
 // ---------- endings ----------
 export function endingContext(s, adv) {
   const al = alive(s);
@@ -608,7 +691,7 @@ export function endingContext(s, adv) {
     s, alive: al.length, total: s.party.length, dead: s.party.length - al.length,
     all: al.length === s.party.length, none: al.length === 0,
     flag: (f) => !!s.flags[f], has: (i) => hasItem(s, i),
-    infected: al.some((c) => c.infected && (c.infected.resolved === 'concealed' || c.infected.resolved === false || c.infected.resolved === 'pending')),
+    infected: al.some((c) => c.infected && !['cured', 'dead'].includes(c.infected.resolved)),
     timeout: !!s.flags._timeout, reached: !!s.flags.reached, sacrifice: !!s.flags.sacrifice, npcs: s.npcs,
   };
 }
@@ -668,7 +751,8 @@ export function updateReplay(replay, s) {
 export function historyRecord(s, adv) {
   return {
     id: 'h_' + s.started + '_' + s.seed, adv: s.adv, advTitle: adv.title, date: Date.now(), seed: s.seed,
-    party: s.party.map((c) => ({ id: c.id, name: c.name, avatar: c.avatar, alive: c.alive, hp: c.hp, cause: c.cause, infected: !!(c.infected && c.alive && c.infected.resolved !== 'cured') })),
+    diff: s.diff,
+    party: s.party.map((c) => ({ id: c.id, name: c.name, avatar: c.avatar, role: c.role, alive: c.alive, hp: c.hp, cause: c.cause, infected: !!(c.infected && c.alive && c.infected.resolved !== 'cured') })),
     ending: s.ending, objective: s.ending?.objective, stages: s.stage,
     survivors: s.party.filter((c) => c.alive).length, deaths: s.party.filter((c) => !c.alive).length,
     decisions: s.log.decisions.map((d) => ({ stage: d.stage, choice: d.choice, major: d.major, title: d.title })),

@@ -1,5 +1,5 @@
 // ADVENTURE 1: LAST TRAIN OUT — zombie-infested city, reach Stonebridge Station.
-import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue } from './kit.js';
+import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue, infectionEvents, roleEvents } from './kit.js';
 
 const A = 'lto';
 const E = (id, o) => ({ id: `${A}_${id}`, ...o });
@@ -928,21 +928,6 @@ const events = [
   }),
 
   // ---------------- INFECTION TURN ----------------
-  E('turn', {
-    cat: 'turn', loc: '*', essential: true, repeat: true, title: `The Fever`, major: true,
-    text: [`{t} has been quiet for a while. Now they are sweating, shivering and grey. The scratch on their arm has turned dark, with black lines spreading under the skin. Everyone knows what it means. {t} knows it too.`],
-    scene: { light: 'dim' }, cast: ['t!', 'h?'], say: [['t', `"It is fine. I am fine. Do not look at me like that."`], ['h', `"{t}... we need to talk about this."`]],
-    choices: [
-      C(`{t} walks away alone`, `{t} chooses to leave before they become a danger.`, [O(1, 'neutral', `{t} hugs everyone, one by one, then walks into the dusk without looking back. It is the bravest thing anyone has seen.`, [['kill', 't', 'walked away alone to protect the group from their infection', 'hero']])], { major: true }),
-      C(`Stay with {t} until the end`, `Nobody should be alone.`, [O(1, 'neutral', `{Team} stays. {t} talks about what they will miss. When it is over, the group carries on, smaller and quieter.`, [['kill', 't', 'lost to the infection, surrounded by friends'], ['time', -2]])]),
-      C(`Hide the infection and keep going`, `Maybe it will not get worse. Maybe nobody needs to know.`, [O(0.6, 'neutral', `{t} pulls down their sleeve. "I can make it to the train." Everyone pretends to believe it.`, [['conceal', 't']]), O(0.4, 'death', `It gets worse fast. {t} turns on {r} before anyone can react.`, [['kill', 't', 'turned from the infection'], ['hurt', 'r', 1]])]),
-      C(`Search for medicine`, `There might be antibiotics nearby. Anything.`, [O(0.25, 'good', `A pharmacy, a miracle: a box of antivirals. {t}'s fever begins to drop.`, [['cure'], ['time', -2], ['hero']]), O(0.75, 'neutral', `Nothing. {t} insists on carrying on anyway, hiding the bite.`, [['conceal', 't'], ['time', -2]])]),
-      C(`Let {t} decide`, `It is their life.`, [O(0.5, 'neutral', `{t} decides to keep going. "Get me to that train. They will have doctors."`, [['conceal', 't']]), O(0.5, 'neutral', `{t} decides to go alone. "Look after each other." And they are gone.`, [['kill', 't', 'chose to leave the group when the infection took hold', 'hero']])]),
-    ],
-    uses: {
-      cure: U(`The experimental serum burns going in. {t} screams, shivers, sleeps. When they wake, the black lines are fading. It worked. It actually worked.`, [['cure'], ['hero']]),
-    },
-  }),
 
   // ---------------- TIMEOUT ----------------
   E('timeout', {
@@ -1038,7 +1023,8 @@ export default {
   targetStages: 32, maxStages: 40,
   finale: [`${A}_fin_gates`, `${A}_fin_platform`], finaleLoc: 'station',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
-  turnEvent: `${A}_turn`, timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`, turnDelay: 4,
+  turnEvent: `${A}_inf_turned`, revealEvent: `${A}_inf_reveal`, cureItem: 'serum', timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`,
+  startKit: { easy: [['crowbar'], ['pistol', 3], ['first_aid'], ['bandages', 2], ['flashlight']], medium: [['bandages', 1], ['flashlight', 2]], hard: [] },
   npcs: {
     gary: { name: `Gary`, traitor: 0, loyal: 0, hair: '#5e5e66', hat: 'cap', hatC: '#2e5fa8', shirt: '#2e5fa8', legs: '#2e5fa8' },
     marta: { name: `Marta`, traitor: 0.06, loyal: 0.75, skin: '#c98552', hair: '#1c1b20', style: 'bun', shirt: '#3a86b4', legs: '#3a86b4' },
@@ -1052,7 +1038,7 @@ export default {
     stranger: { name: `the stranger`, traitor: 0.2, loyal: 0.4, skin: '#eeb48b', hair: '#6b3e1f', style: 'long', shirt: '#9d0208', legs: '#2b2d42' },
     biscuit: { name: `Biscuit`, traitor: 0, loyal: 0.8, kind: 'dog', coat: '#c8a26b' },
   },
-  items, locations, events: [...evs, ...companionEvents(A)], defaultLoot: ['bandages', 'tinned_food', 'energy_drink', 'batteries'],
+  items, locations, events: [...evs, ...companionEvents(A), ...infectionEvents(A, { weaponWord: 'a crowbar, axe or gun' }), ...roleEvents(A, { weapon: 'crowbar', medical: 'bandages', light: 'flashlight', junk: 'scrap metal' })], defaultLoot: ['bandages', 'tinned_food', 'energy_drink', 'batteries'],
   travelText: [`{loc} is behind {team} now. Three routes lead on toward Stonebridge. The clock is ticking: {clock} until the train leaves.`, `Time to move on from {loc}. Which way now? {clock} left on the clock.`, `{Team} gathers at the edge of {loc}. Stonebridge is still miles away, and the train leaves in {clock}.`, `Smoke drifts over the rooftops. Three ways onward from {loc}, and {clock} until the last train.`, `A distant train horn sounds, just a test, hopefully. {clock} left. Which route?`],
   travelSay: [['a', [`"Which way? Quickly."`, `"We cannot stay here. Pick a route."`, `"Every minute counts. Let us choose."`]]],
   travelOutcomes: T,

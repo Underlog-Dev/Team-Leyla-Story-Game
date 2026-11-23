@@ -214,3 +214,74 @@ export const companionRescue = C(`{npc} throws themselves in the way`, `Your com
   L(0.6, 'traitor', 'bad', `{npc} steps forward, then steps back, grabs a bag in the chaos, and runs. {t} is left to fight alone.`, [['hurt', 't', 1], ['npcsteal', 1], ['npcleave', null, 'traitor']]),
   L(0.4, 'traitor', 'good', `{npc} saves {t}, but only because they need the group, for now.`),
 ], { req: { companion: true } });
+
+// ---------------------------------------------------------------------------
+// Infection. Three options only: put them down (needs a weapon), cure them
+// (needs a cure), or keep them and look for a cure. If the 5-turn countdown
+// runs out, they turn and someone dies.
+export function infectionEvents(A, { weaponWord = 'a weapon' } = {}) {
+  const E = (id, o) => ({ id: `${A}_${id}`, ...o });
+  return [
+    E('inf_reveal', {
+      cat: 'turn', loc: '*', essential: true, repeat: true, major: true, fewChoices: true, title: `Infected`,
+      text: [`{t} pulls back their sleeve. The scratch has gone dark, with thin black lines creeping out from it. {t} is infected. Without a cure, they will turn in 5 turns.`, `{t} is shaking and grey. The wound is hot to the touch and the veins around it are turning black. {t} is infected, and the clock is ticking: 5 turns.`],
+      scene: { light: 'dim' }, cast: ['t!', 'h?'], say: [['t', [`"It is nothing. It is fine. ...It is not fine, is it?"`, `"How long have I got?"`]], ['h', `"{t}... we need to decide. Now."`]],
+      choices: [
+        C(`Put {t} down now`, `Quick and merciful, while they are still {t}. Uses ${weaponWord}.`, [O(1, 'neutral', `{t} nods and closes their eyes. It is quick. It is the hardest thing anyone in the group has ever done.`, [['useany', ['melee', 'gun']], ['kill', 't', 'was put down by the group before the infection could take hold']])], { req: { anyItems: ['melee', 'gun'] }, major: true }),
+        C(`Give {t} the cure`, `Use the cure from the backpack.`, [O(1, 'good', `The cure goes in. {t} shudders, sweats and sleeps. When they wake, the black lines are fading. It worked.`, [['use', 'tag', 'cure'], ['cure'], ['hero']])], { req: { tags: ['cure'] } }),
+        C(`Keep {t} with you and look for a cure`, `5 turns to find a cure. You can still put {t} down at any time.`, [O(1, 'neutral', `{t} pulls their sleeve down. "Find me a cure. Please." The countdown has started.`)]),
+      ],
+    }),
+    E('inf_turned', {
+      cat: 'turn', loc: '*', essential: true, repeat: true, major: true, fewChoices: true, title: `Turned`,
+      text: [`Time has run out. {t} stops walking. Their head drops. When it comes back up, their eyes are milky white. Before anyone can move, {t} lunges at {v}.`, `The countdown is over. A horrible sound comes from {t}: half a groan, half a growl. {t} has turned, and {v} is closest.`],
+      scene: { light: 'alert' }, cast: ['t!', 'v'], say: [['v', `"{t}! No, {t}, it is me!"`]],
+      choices: [
+        C(`There is nothing anyone can do`, `{t} has turned.`, [O(1, 'death', `{t} drags {v} down before anyone can pull them apart. By the time it is over, {t} and {v} are both gone.`, [['bite', 'v'], ['kill', 't', 'turned into one of the infected']])]),
+      ],
+    }),
+  ];
+}
+
+// Role scenes: give each role a moment to shine.
+export function roleEvents(A, { weapon, medical, light, junk = 'scrap', place = 'workshop' }) {
+  const E = (id, o) => ({ id: `${A}_${id}`, ...o });
+  return [
+    E('role_build', {
+      cat: 'item', loc: '*', req: { trait: 'Engineer' }, title: `Make Do and Mend`,
+      text: [`{x} spots a pile of ${junk} and broken gadgets and gets a look in their eye. "Give me ten minutes. I can make something out of this."`],
+      cast: ['a'], say: [['a', `"Ten minutes? Can you do five?"`]],
+      choices: [
+        C(`{x} builds a weapon`, `Something heavy, sturdy and nasty.`, [O(0.8, 'item', `{x} bolts and tapes it together: {loot}. It is ugly. It works.`, [['item', weapon], ['time', -1]]), O(0.2, 'hurt', `It works, but {x} slices a hand building it.`, [['item', weapon], ['hurt', 'x', 1], ['time', -1]])], { badge: true }),
+        C(`{x} rigs up a light`, `Torch, batteries, wires.`, [O(1, 'item', `A few twists of wire and {x} hands over {loot}.`, [['item', light], ['time', -1]])], { badge: true }),
+        C(`{x} builds a noisy decoy`, `Something to draw them away later.`, [O(1, 'good', `{x} rigs a decoy and sets it off two streets away. The noise level drops right back down as the infected wander off after it.`, [['time', -1]])]),
+        safe(`No time. Keep moving.`, `Tinkering can wait.`, { t: `{x} looks longingly at the pile and moves on.` }),
+        search(`Search the pile for anything useful`, `Forget building. Just take things.`, { item: 0.6, hurt: 0.1 }),
+      ],
+    }),
+    E('role_triage', {
+      cat: 'interaction', loc: '*', req: { trait: 'Medic', injured: true }, title: `Field Hospital`,
+      text: [`{x} looks at the state of everyone and sets their jaw. "Right. Everyone sit down. Nobody moves until I have looked at every cut."`],
+      cast: ['a'], say: [['a', `"Yes, doctor."`]],
+      choices: [
+        C(`Let {x} treat everyone`, `It takes time, but {x} knows what they are doing.`, [O(1, 'good', `{x} works through everyone with calm, quick hands. The worst wounds are cleaned and closed.`, [['heal', 'all', 1], ['time', -2]])], { badge: true }),
+        C(`Just the worst injury`, `Quick and focused.`, [O(1, 'good', `{x} patches up the worst wound in two minutes flat.`, [['heal', 'injured', 2], ['time', -1]])], { badge: true }),
+        C(`{x} makes bandages from spare clothing`, `For later.`, [O(1, 'item', `Torn shirts, boiled and folded: {loot}.`, [['item', medical], ['time', -1]])]),
+        safe(`Keep moving`, `No time.`, { t: `{x} grumbles about infection rates the whole way.` }),
+        C(`{x} checks everyone for scratches`, `Better to know.`, [O(1, 'good', `{x} checks every arm and leg. Nothing new. Everyone breathes a bit easier.`, [['heal', 'injured', 1], ['time', -1]])]),
+      ],
+    }),
+    E('role_scout', {
+      cat: 'item', loc: '*', req: { trait: 'Scout' }, title: `Sharp Eyes`,
+      text: [`{x} stops dead and points at something nobody else noticed: a hidden gap, a stash, a way through. "There. Look."`],
+      cast: ['a'], say: [['a', `"How did you even see that?"`]],
+      choices: [
+        C(`Follow {x} to the stash`, `Trust the scout.`, [O(0.85, 'item', `Tucked out of sight, exactly where {x} said: {loot}.`, [['loot']]), O(0.15, 'danger', `There is a stash, and something guarding it. It lunges at {r}.`, [['loot'], ['em', 'r']])], { badge: true }),
+        C(`Let {x} find a shortcut`, `A scout knows the ground.`, [O(1, 'good', `{x} leads everyone through a gap nobody else would have spotted. Time saved.`, [['time', 2]])], { badge: true }),
+        C(`{x} scouts for danger ahead`, `Know what is coming.`, [O(1, 'good', `{x} spots a group of infected ahead and steers everyone round them.`, [['time', 1]])]),
+        safe(`Ignore it and keep going`, `No detours.`),
+        search(`Everyone search the area`, `More eyes, more finds.`, { item: 0.55, hurt: 0.08 }),
+      ],
+    }),
+  ];
+}
