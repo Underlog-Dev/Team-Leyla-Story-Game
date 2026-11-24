@@ -113,7 +113,7 @@ function render() {
   renderModal();
   renderToast();
   if (S.screen === 'editor') document.getElementById('cdesc')?.addEventListener('input', () => { syncEditor(); const el = document.getElementById('talkprev'); if (el && S.editing) el.innerHTML = talkPreviewHTML(S.editing); });
-  if (S.screen === 'play' && streamLayout()) fitStream();
+  if (S.screen === 'play' && streamLayout()) { if (!S.pack && !S.modal) window.scrollTo(0, 0); fitStream(); }
 }
 const streamLayout = () => streamOn() && !TUT.on;
 
@@ -171,17 +171,14 @@ function streamPlay(g, a) {
       ${rosterHTML(g, true)}
       ${g.npcs.length ? `<div class="companions">With you: ${g.npcs.map((id) => `<b>${h(npcName(a, id))}</b>`).join(', ')}</div>` : ''}
       <div class="sp-body" id="spBody">${page === 'story' ? story : vote}</div>
-      <div class="chat-zone ${safeZone()}"><div class="chat-label">💬 TikTok chat shows here</div>
       <div class="playfoot">
         ${page === 'story'
     ? `<button class="btn pack" data-a="openPack">🎒 ${invCount}/${packSlots(g)}${g.inv.some((i) => itemUsable(g, a, i.id)) ? ' ✨' : ''}</button><button class="btn next ready" data-a="spage" data-p="vote">📊 VOTE ➜</button>`
     : `<button class="btn" data-a="spage" data-p="story">◀ STORY</button><button class="btn pack" data-a="openPack">🎒 ${invCount}/${packSlots(g)}${g.inv.some((i) => itemUsable(g, a, i.id)) ? ' ✨' : ''}</button><button class="btn next ${sel ? 'ready' : ''}" data-a="next" ${sel ? '' : 'disabled'}>${sel ? `GO WITH ${L(S.sel)} ➜` : 'PICK ONE'}</button>`}
-      </div></div>
+      </div>
       ${S.pack ? packHTML() : ''}
     </div>`;
 }
-// How much of the bottom of the screen to keep free for TikTok's chat.
-function safeZone() { return ['none', 'small', 'medium', 'large'].includes(S.settings.safe) ? S.settings.safe : 'medium'; }
 
 function rosterHTML(g, stream) {
   const party = g.party, n = party.length;
@@ -207,7 +204,6 @@ const SCREENS = {
         <button class="mode-opt ${streamOn() ? '' : 'on'}" data-a="setMode" data-m="solo" aria-pressed="${!streamOn()}"><b>🎮 Solo</b><span>You make every choice</span></button>
         <button class="mode-opt ${streamOn() ? 'on' : ''}" data-a="setMode" data-m="stream" aria-pressed="${streamOn()}"><b>📺 Streamer</b><span>Big text for chat, run a TikTok poll</span></button>
       </div>
-      ${streamOn() ? `<div class="safe-pick"><span>TikTok chat space at the bottom:</span>${[['none', 'None'], ['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']].map(([k, l]) => `<button class="btn small ${safeZone() === k ? 'green' : ''}" data-a="setSafe" data-k="${k}" aria-pressed="${safeZone() === k}">${l}</button>`).join('')}</div>` : ''}
       <div class="menu">
         ${sv ? `<button class="btn big green" data-a="continue">▶ Continue Adventure<small>${h(advTitle)} · Stage ${sv.stage}</small></button>` : ''}
         <button class="btn big red" data-a="newAdventure">☠ New Adventure</button>
@@ -662,7 +658,6 @@ const A = {
     modal('Add to Home Screen', `<ol class="install-steps">${steps.map(([ic, t], i) => `<li><span class="step-n">${i + 1}</span><span class="step-ic">${ic}</span><span>${t}</span></li>`).join('')}</ol><p class="note">The game then opens full screen from the zombie icon, like a normal app. Your characters are saved separately there, so use <b>Export</b> in the Character Library to bring them across.</p>`, [{ label: 'Got it', cls: 'green' }]);
   },
   go: (d) => go(d.to),
-  setSafe(d) { S.settings.safe = d.k; S.store?.setSettings(S.settings).catch(() => {}); render(); toast(d.k === 'none' ? 'No chat space kept free.' : `Keeping a ${d.k} space free for TikTok chat.`); },
   spage(d) { S.spage = d.p === 'vote' ? 'vote' : 'story'; render(); window.scrollTo(0, 0); },
   tutorial: () => startTutorial(),
   setMode(d) { S.settings.mode = d.m === 'stream' ? 'stream' : 'solo'; applySettings(); S.store?.setSettings(S.settings).catch(() => {}); render(); toast(streamOn() ? '📺 Streamer mode on.' : '🎮 Solo mode on.'); },
