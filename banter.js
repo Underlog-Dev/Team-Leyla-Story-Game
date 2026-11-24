@@ -12,7 +12,7 @@
 import { PERSONAS, personaOf, personaKey, packsOf, birthdayToday } from './persona.js';
 
 // ---------------- voices ----------------
-export const VOICES = ['Funny', 'Sarcastic', 'Nervous', 'Brave', 'Reckless', 'Kind', 'Intelligent', 'Practical', 'Mysterious', 'Gamer', 'Foodie', 'Nature lover', 'Loyal'];
+export const VOICES = ['Funny', 'Sarcastic', 'Nervous', 'Brave', 'Reckless', 'Kind', 'Intelligent', 'Practical', 'Mysterious', 'Gamer', 'Foodie', 'Nature lover', 'Loyal', 'Collector'];
 const ROLE_VOICE = { Leader: 'Brave', Fighter: 'Reckless', Medic: 'Kind', Engineer: 'Practical', Scout: 'Nervous', Athlete: 'Funny' };
 export function voiceOf(c) {
   const t = (c.traits || []).find((x) => VOICES.includes(x));
@@ -128,6 +128,15 @@ const VL = {
     hurt: ['"{h}, I know a leaf that helps with that. Somewhere."'],
     ouch: ['"Stung. Or bitten. Or stabbed. Something."'],
     item: ['"{item}. Not as good as a nice stick, but fine."'],
+  },
+  Collector: {
+    calm: ['"I hope my collection is okay. It is the only thing I trust."', '"Mint condition. That is all I ask from life."', '"I would trade a rare one for a hot shower right now. A common. Maybe an uncommon."'],
+    tense: ['"Not the collection! ANYTHING but the collection!"', '"If I die, someone look after my cards."'],
+    win: ['"That was a rare moment. Legendary, even."'],
+    fail: ['"That was worth less than a common."'],
+    hurt: ['"{h}, you will be okay. Probably. Like a slightly damaged card."'],
+    ouch: ['"Ow. At least the collection is fine."'],
+    item: ['"{item}. Rare find. I am keeping that in a sleeve."'],
   },
   Loyal: {
     calm: ['"Whatever happens, we stick together."', '"I have got your back. All of you. Always."'],
@@ -588,7 +597,7 @@ export const TRAIT_TALK = {
   Funny: 'cracks jokes, even at terrible moments', Sarcastic: 'dry, eye-rolling comments', Nervous: 'panics, worries, hears every noise',
   Brave: 'steps up and protects people', Reckless: 'wants to fight everything, terrible plans', Kind: 'looks after everyone, very caring',
   Intelligent: 'facts, maths and "technically..."', Practical: 'blunt, sensible, organised', Mysterious: 'cryptic and strange, knows things',
-  Gamer: 'talks like life is a video game', Foodie: 'always thinking about food', 'Nature lover': 'notices animals, plants and weather', Loyal: 'fiercely protective of the group',
+  Gamer: 'talks like life is a video game', Collector: 'obsessed with their collection, treats finds like rare cards', Foodie: 'always thinking about food', 'Nature lover': 'notices animals, plants and weather', Loyal: 'fiercely protective of the group',
 };
 const plain = (t, c) => String(t).replace(/\{z\}/g, 'zombie').replace(/\{zs\}/g, 'zombies').replace(/\{Zs?\}/g, 'Zombie').replace(/\{item\}/g, 'a torch')
   .replace(/\{h\}/g, 'mate').replace(/\{critter\}/g, 'pigeon').replace(/\{snack\}/g, 'custard creams').replace(/\{place\}/g, 'city').replace(/\{goal\}/g, 'safety')

@@ -217,6 +217,27 @@ const LIGHT = {
   storm: '<rect width="96" height="54" fill="#0b132b" opacity="0.35"/>',
 };
 
+// Hatice never goes anywhere without Kheria, her tiny tabby cat.
+const isHatice = (c) => c && (c.id === 'c_starter_hatice' || /^hatice$/i.test(String(c.name || '').trim()));
+function kheria(x, y) {
+  // a small grey tabby sitting facing out: pointy ears, green eyes, white chest and paws, curled tail
+  const G = '#9a9ca3', K = '#2b2c31', W = '#f2f2f2', E = '#9be26a', P = '#e98a9a';
+  const map = [
+    'K....K..',
+    'KG..GK..',
+    'GGGGGG..',
+    'GEGGEG..',
+    'GWWPWG..',
+    '.KGWGK.K',
+    '.GKWKG.K',
+    '.GGWGGKK',
+    '.WW.WW..',
+  ];
+  let out = '<g class="kheria">';
+  map.forEach((row, dy) => { for (let dx = 0; dx < row.length; dx++) { const c = { G, K, W, E, P }[row[dx]]; if (c) out += `<rect x="${x + dx}" y="${y + dy}" width="1" height="1" fill="${c}"/>`; } });
+  return out + '</g>';
+}
+
 export function sceneSVG(scene, party = [], { stage = 0, cls = '' } = {}) {
   const name = SCENES[scene?.bg] ? scene.bg : 'street';
   const g = canvas(name + ':' + (stage % 7));
@@ -230,11 +251,16 @@ export function sceneSVG(scene, party = [], { stage = 0, cls = '' } = {}) {
   for (let i = 0; i < z; i++) out += zombie(g, 85 - i * 9, 36 + (i % 2) * 2, ZSHIRTS[(i + stage) % ZSHIRTS.length], i);
   let nx = 93 - z * 9 - npcW;
   for (const n of npcs) { out += npcSprite(n, nx); nx += n.kind === 'parrot' ? 7 : n.kind === 'dog' ? 12 : 10; }
-  const room = Math.max(1, Math.floor((93 - z * 9 - npcW - 3) / 11));
-  const cast = party.slice(0, Math.min(6, room));
+  // fit as many of the group as there is room for (Kheria needs a little space next to Hatice)
+  const limit = 93 - z * 9 - npcW;
+  const cast = [];
+  let w = 3;
+  for (const c of party.slice(0, 6)) { const need = 11 + (isHatice(c) ? 7 : 0); if (cast.length && w + need > limit) break; cast.push(c); w += need; }
+  let cx = 3;
   cast.forEach((c, i) => {
-    const x = 3 + i * 11, y = 37;
-    out += `<g class="hero" style="animation-delay:${i * 0.2}s"><rect x="${x + 2}" y="${y + 10}" width="6" height="5" fill="${avatarBg(c.avatar)}"/><rect x="${x + 2}" y="${y + 14}" width="6" height="1" fill="#000" opacity="0.3"/><svg x="${x}" y="${y}" width="10" height="10" viewBox="0 0 16 16">${avatarInner(c.avatar, false)}</svg></g>`;
+    const x = cx, y = 37;
+    cx += 11 + (isHatice(c) ? 7 : 0);
+    out += `<g class="hero" style="animation-delay:${i * 0.2}s"><rect x="${x + 2}" y="${y + 10}" width="6" height="5" fill="${avatarBg(c.avatar)}"/><rect x="${x + 2}" y="${y + 14}" width="6" height="1" fill="#000" opacity="0.3"/><svg x="${x}" y="${y}" width="10" height="10" viewBox="0 0 16 16">${avatarInner(c.avatar, false)}</svg>${isHatice(c) ? kheria(x + 8, y + 6) : ''}</g>`;
   });
   if (scene?.light && LIGHT[scene.light]) out += LIGHT[scene.light];
   if (scene?.fx === 'water') out += '<rect y="44" width="96" height="10" fill="#1d4e89" opacity="0.55"/>';

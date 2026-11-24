@@ -939,7 +939,7 @@ export default addComedy({
   finale: [`${A}_fin_launch`, `${A}_fin_crossing`], finaleLoc: 'sea',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
   turnEvent: `${A}_inf_turned`, revealEvent: `${A}_inf_reveal`, cureItem: 'antiviral', timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`,
-  startKit: { easy: [['fire_axe'], ['pistol', 2], ['first_aid'], ['bandages', 2], ['flashlight']], medium: [['bandages', 1], ['flashlight', 2]], hard: [] },
+  startKit: { easy: [['fire_axe'], ['first_aid'], ['bandages', 1]], medium: [['bandages', 1]], hard: [] },
   npcs: {
     bruno: { name: `Chef Bruno`, traitor: 0.07, loyal: 0.7, skin: '#eeb48b', hair: '#1c1b20', hat: 'chef', shirt: '#f7f7fa', legs: '#2b2d42', extra: 'apron', beard: '#1c1b20' },
     delphine: { name: `Delphine`, traitor: 0.15, loyal: 0.5, skin: '#734125', hair: '#1c1b20', style: 'long', shirt: '#e468a8', extra: 'gown' },

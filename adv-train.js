@@ -1026,7 +1026,7 @@ export default addComedy({
   finale: [`${A}_fin_gates`, `${A}_fin_platform`], finaleLoc: 'station',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
   turnEvent: `${A}_inf_turned`, revealEvent: `${A}_inf_reveal`, cureItem: 'serum', timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`,
-  startKit: { easy: [['crowbar'], ['pistol', 3], ['first_aid'], ['bandages', 2], ['flashlight']], medium: [['bandages', 1], ['flashlight', 2]], hard: [] },
+  startKit: { easy: [['crowbar'], ['first_aid'], ['bandages', 1]], medium: [['bandages', 1]], hard: [] },
   npcs: {
     gary: { name: `Gary`, traitor: 0, loyal: 0, hair: '#5e5e66', hat: 'cap', hatC: '#2e5fa8', shirt: '#2e5fa8', legs: '#2e5fa8' },
     marta: { name: `Marta`, traitor: 0.06, loyal: 0.75, skin: '#c98552', hair: '#1c1b20', style: 'bun', shirt: '#3a86b4', legs: '#3a86b4' },

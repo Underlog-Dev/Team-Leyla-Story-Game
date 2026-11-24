@@ -411,3 +411,35 @@ body[data-mode="stream"] .choice .num { font-size: 18px; padding: 8px 10px; min-
 .sp-body.tight .say b { display: inline; font-size: 1em; color: var(--yellow); }
 .sp-body.tight .say b::after { content: ': '; }
 .sp-body.tight .say span { display: inline; }
+.rk.time { background: #2a3550; color: #cfe0ff; }
+.slots { font-family: var(--body); font-size: .8em; color: var(--dim); }
+.slots.full { color: var(--red); }
+/* TikTok chat space: content stays above it, only the host's buttons sit inside it */
+.chat-zone { flex: none; display: flex; flex-direction: column; justify-content: flex-end; position: relative; }
+.chat-zone.none { height: auto; }
+.chat-zone.small { height: 22vh; height: 22dvh; }
+.chat-zone.medium { height: 30vh; height: 30dvh; }
+.chat-zone.large { height: 38vh; height: 38dvh; }
+.chat-zone:not(.none) { border-top: 2px dashed rgba(255, 255, 255, .12); background: repeating-linear-gradient(135deg, rgba(255,255,255,.02) 0 10px, transparent 10px 20px); }
+.chat-label { position: absolute; top: 6px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255, 255, 255, .25); }
+.chat-zone.none .chat-label { display: none; }
+.chat-zone .playfoot { border-top: 0; background: transparent; }
+.sec-h { display: flex; align-items: center; gap: 6px; font-family: var(--title); font-size: calc(10px * var(--fit) + 2px); color: var(--yellow); margin: 6px 0 2px; line-height: 1.5; }
+.sec-n { display: inline-flex; align-items: center; justify-content: center; min-width: 1.6em; height: 1.6em; background: var(--yellow); color: #1a1208; border-radius: 50%; font-size: .9em; }
+.sec-next { margin-top: 6px; font-size: .75em; color: var(--dim); text-align: center; }
+.safe-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; margin: 0 12px 6px; font-size: .8em; color: var(--dim); }
+.sp-body .scene-wrap { width: min(100%, calc(24vh * 96 / 54)); }
+/* backpack: items you can use now are in colour, the rest are greyed out */
+.pack-item { position: relative; }
+.pack-item.dull svg, .pack-detail.dull svg { filter: grayscale(1) brightness(.6); opacity: .7; }
+.pack-item.dull span { color: var(--dim); }
+.pack-item.usable { border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow) inset; }
+.use-dot { position: absolute; top: 2px; right: 4px; font-style: normal; font-size: 12px; }
+.use-hint { margin: 6px 0; font-size: .85em; }
+.use-hint.yes { color: var(--yellow); }
+.use-hint.no { color: var(--dim); }
+.play.stream .topbar { padding-top: 4px; padding-bottom: 4px; }
+.play.stream .topbar .icon-btn { width: 38px; height: 38px; }
+.roster.sroster .mini .px-avatar { width: min(100%, 36px); }
+.time-note { font-size: .75em; color: #cfe0ff; margin: 2px 12px 4px; }
+.sp-body .time-note { margin: 2px 0 0; }

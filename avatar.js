@@ -301,5 +301,5 @@ export function avatarSVG(av, { size = 64, bg = true, cls = '' } = {}) {
 export function avatarBg(av) { return avatarGrid(av).bg; }
 
 // Personality tags affect dialogue only. Roles (in characters.js) affect gameplay.
-export const TRAITS = ['Funny', 'Intelligent', 'Brave', 'Nervous', 'Kind', 'Reckless', 'Practical', 'Mysterious', 'Nature lover', 'Gamer', 'Sarcastic', 'Loyal', 'Foodie'];
+export const TRAITS = ['Funny', 'Intelligent', 'Brave', 'Nervous', 'Kind', 'Reckless', 'Practical', 'Mysterious', 'Nature lover', 'Gamer', 'Sarcastic', 'Loyal', 'Foodie', 'Collector'];
 export const ROLE_LIST = ['Medic', 'Engineer', 'Fighter', 'Scout', 'Leader', 'Athlete'];

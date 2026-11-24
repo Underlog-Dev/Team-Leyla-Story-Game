@@ -5,7 +5,7 @@ import { makeCharacter, randomCharacter, exportLibrary, parseImport, mergeLibrar
 import { ADVENTURES, advById } from './adventures.js';
 import { sampleTalk, TRAIT_TALK } from './banter.js';
 import { personaKey, petOf } from './persona.js';
-import { newGame, choose, useItem, findItemUse, formatClock, historyRecord, updateReplay, statsFrom, hpLabel, MAX_HP, listNames, companionSummary, npcName, ROLES, DIFFICULTY, MAX_PARTY, infectDelay, mercyKill } from './engine.js';
+import { newGame, choose, dropItem, packSlots, itemUsable, useItem, findItemUse, formatClock, historyRecord, updateReplay, statsFrom, hpLabel, MAX_HP, listNames, companionSummary, npcName, ROLES, DIFFICULTY, MAX_PARTY, infectDelay, mercyKill } from './engine.js';
 import { makeSeed, cleanSeed } from './rng.js';
 import { sceneSVG } from './scenes.js';
 import { iconSVG } from './icons.js';
@@ -44,17 +44,18 @@ const OLD_STARTERS = ['mo', 'bex', 'tank', 'skye', 'captainjo', 'zippy', 'dex', 
 // Update 17: the crew's descriptions and tags now match their personalities.
 // Only characters nobody has edited are refreshed.
 const CREW_V16_DESC = {"leyla": "The host. Calls the shots, keeps the crew alive (mostly).", "bravo": "Part survivor, part cat. Always lands on his feet, always in a suit.", "chris": "Can rig anything that has wires in it.", "hyrisha": "Fastest legs in the crew. Waves never out of place.", "hiwi": "Calm hands, sharp mind. Patches everyone up.", "dardan": "Knows every trail, every plant, every shortcut.", "sonila": "Spots trouble before it spots her.", "isma": "Never leaves anyone behind.", "doa": "Fixes it first, explains it later.", "toddy": "Bucket hat on, no plan, full speed.", "hatice": "Never goes anywhere without her cat, Kheria.", "gaza": "Thousands of hours of practice. Finally, real life.", "loni": "The hair goes up when the fight starts.", "ikram": "Nobody knows where he came from. Nobody asks."};
+const CREW_V17_DESC = { sonila: 'Nail technician and sharp-eyed scout. Stays sarcastic while everyone else panics.', isma: "Loyal to the group, suspicious of everyone else. Wants to block everyone. Insists it is Chris's birthday.", ikram: 'Nobody knows where he came from, or how he knows the things he knows.' };
 async function refreshCrew() {
-  if (S.settings.crewV4) return;
+  if (S.settings.crewV5) return;
   const fresh = Object.fromEntries(starterCrew([]).map((c) => [c.name.toLowerCase(), c]));
   for (let i = 0; i < S.chars.length; i++) {
     const c = S.chars[i]; const k = c.name.toLowerCase();
-    if (c.id === 'c_starter_' + k && fresh[k] && CREW_V16_DESC[k] === c.description) {
+    if (c.id === 'c_starter_' + k && fresh[k] && fresh[k].description !== c.description && (CREW_V16_DESC[k] === c.description || CREW_V17_DESC[k] === c.description)) {
       S.chars[i] = { ...c, description: fresh[k].description, traits: fresh[k].traits };
       try { await S.store.saveCharacter(S.chars[i]); } catch {}
     }
   }
-  S.settings.crewV4 = true;
+  S.settings.crewV4 = true; S.settings.crewV5 = true;
   try { await S.store.setSettings(S.settings); } catch {}
 }
 async function seedTeamLeyla() {
@@ -144,18 +145,21 @@ function streamPlay(g, a) {
   const page = S.spage === 'vote' ? 'vote' : 'story';
   const sel = S.sel != null ? cur.choices[S.sel] : null;
   const invCount = g.inv.length;
+  let n = 0;
+  const sec = (t) => `<div class="sec-h"><span class="sec-n">${++n}</span>${t}</div>`;
+  const chips = last ? `<div class="chips">${last.gained.map((x) => `<span class="chip g">＋ ${h(x)}</span>`).join('')}${last.lost.map((x) => `<span class="chip r">－ ${h(x)}</span>`).join('')}${last.hurt.filter((x) => !last.deaths.includes(x)).map((x) => `<span class="chip r">🩸 ${h(x)} hurt</span>`).join('')}${last.healed.map((x) => `<span class="chip g">✚ ${h(x)} healed</span>`).join('')}${(last.left || []).map((x) => `<span class="chip r">🎒 full: ${h(x)} left behind</span>`).join('')}${last.deaths.map((x) => `<span class="chip dead">☠ ${h(x)} died</span>`).join('')}</div>` : '';
   const story = `
-      <div class="scene-wrap">${sceneSVG(cur.scene, castChars, { stage: g.stage })}<div class="scene-title">${h(cur.title)}</div></div>
-      ${last ? `<div class="outcome panel ${last.deaths.length ? 'bad' : last.kind === 'hurt' || last.kind === 'danger' || last.kind === 'infect' ? 'warn' : 'ok'}">
-        <div class="lbl">WHAT HAPPENED · <span>${last.letter ? `${h(last.letter)}: ` : ''}${h(last.choice)}</span></div>${storyHTML(last.text, party)}${(last.say || []).map((l) => sayHTML(l, party)).join('')}
-        <div class="chips">${last.gained.map((n) => `<span class="chip g">＋ ${h(n)}</span>`).join('')}${last.lost.map((n) => `<span class="chip r">－ ${h(n)}</span>`).join('')}${last.hurt.filter((n) => !last.deaths.includes(n)).map((n) => `<span class="chip r">🩸 ${h(n)} hurt</span>`).join('')}${last.healed.map((n) => `<span class="chip g">✚ ${h(n)} healed</span>`).join('')}${last.deaths.map((n) => `<span class="chip dead">☠ ${h(n)} died</span>`).join('')}</div></div>` : ''}
+      ${last ? `${sec(`CHAT CHOSE ${h(last.letter || '')}: ${h(last.choice)}`)}
+      <div class="outcome panel ${last.deaths.length ? 'bad' : last.kind === 'hurt' || last.kind === 'danger' || last.kind === 'infect' ? 'warn' : 'ok'}">${storyHTML(last.text, party)}${(last.say || []).map((l) => sayHTML(l, party)).join('')}${chips}</div>` : ''}
+      ${sec(`NOW: ${h(cur.title)}`)}
+      <div class="scene-wrap">${sceneSVG(cur.scene, castChars, { stage: g.stage })}</div>
       ${cur.react ? `<p class="react">${h(cur.react)}</p>` : ''}
-      <div class="now-lbl">NOW: ${h(cur.title)}</div>
       <p class="narr">${h(cur.text)}</p>
-      ${cur.say.map((l) => sayHTML(l, party)).join('')}
-      ${infectedBanner(g, a)}`;
+      ${cur.say.length ? `${sec('THE GROUP')}${cur.say.map((l) => sayHTML(l, party)).join('')}` : ''}
+      ${infectedBanner(g, a)}
+      <div class="sec-next">Next: vote on what to do ⬇</div>`;
   const vote = `
-      <div class="vote-head"><div><div class="now-lbl">WHAT DO WE DO? · ${h(cur.title)}</div><div class="vote-sub">Chat, vote A–E!</div></div><button class="btn small" data-a="copyOpts" aria-label="Copy options for chat">📋</button></div>
+      <div class="vote-head"><div>${sec(`VOTE: ${h(cur.title)}`)}<div class="vote-sub">What should the group do? Vote A, B, C, D or E in the poll.</div><div class="time-note">⏱ Every choice takes ${a.clock?.unit || 10} min. Some take extra.</div></div><button class="btn small" data-a="copyOpts" aria-label="Copy options for chat">📋</button></div>
       <div class="choices">${cur.choices.map((c, i) => choiceHTML(c, i, party)).join('')}</div>
       ${infectedBanner(g, a)}`;
   return `<div class="play stream ${page} ${S.flash ? 'flash' : ''}" style="--accent:${a.colour}">
@@ -167,18 +171,21 @@ function streamPlay(g, a) {
       ${rosterHTML(g, true)}
       ${g.npcs.length ? `<div class="companions">With you: ${g.npcs.map((id) => `<b>${h(npcName(a, id))}</b>`).join(', ')}</div>` : ''}
       <div class="sp-body" id="spBody">${page === 'story' ? story : vote}</div>
+      <div class="chat-zone ${safeZone()}"><div class="chat-label">💬 TikTok chat shows here</div>
       <div class="playfoot">
         ${page === 'story'
-    ? `<button class="btn pack" data-a="openPack">🎒${invCount ? `<span class="badge">${invCount}</span>` : ''}</button><button class="btn next ready" data-a="spage" data-p="vote">📊 OPTIONS ➜</button>`
-    : `<button class="btn" data-a="spage" data-p="story">◀ STORY</button><button class="btn pack" data-a="openPack">🎒${invCount ? `<span class="badge">${invCount}</span>` : ''}</button><button class="btn next ${sel ? 'ready' : ''}" data-a="next" ${sel ? '' : 'disabled'}>${sel ? `GO WITH ${L(S.sel)} ➜` : 'PICK ONE'}</button>`}
-      </div>
+    ? `<button class="btn pack" data-a="openPack">🎒 ${invCount}/${packSlots(g)}${g.inv.some((i) => itemUsable(g, a, i.id)) ? ' ✨' : ''}</button><button class="btn next ready" data-a="spage" data-p="vote">📊 VOTE ➜</button>`
+    : `<button class="btn" data-a="spage" data-p="story">◀ STORY</button><button class="btn pack" data-a="openPack">🎒 ${invCount}/${packSlots(g)}${g.inv.some((i) => itemUsable(g, a, i.id)) ? ' ✨' : ''}</button><button class="btn next ${sel ? 'ready' : ''}" data-a="next" ${sel ? '' : 'disabled'}>${sel ? `GO WITH ${L(S.sel)} ➜` : 'PICK ONE'}</button>`}
+      </div></div>
       ${S.pack ? packHTML() : ''}
     </div>`;
 }
+// How much of the bottom of the screen to keep free for TikTok's chat.
+function safeZone() { return ['none', 'small', 'medium', 'large'].includes(S.settings.safe) ? S.settings.safe : 'medium'; }
 
 function rosterHTML(g, stream) {
   const party = g.party, n = party.length;
-  const cols = stream ? (n <= 7 ? Math.max(n, 4) : n <= 14 ? Math.ceil(n / 2) : 10) : 0;
+  const cols = stream ? (n <= 10 ? Math.max(n, 5) : 10) : 0;
   const big = !stream && n > 7;
   return `<div class="roster ${big ? 'many' : ''} ${stream ? 'sroster' : ''}" ${stream ? `style="--rc:${cols}"` : ''}>${n > 7 ? `<div class="alive-count">${party.filter((c) => c.alive).length}/${n} alive</div>` : ''}${party.map((c) => `<div class="mini ${c.alive ? '' : 'dead'} ${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? 'infected' : ''}" title="${h(c.name)}: ${c.alive ? hpLabel(c.hp) : 'Dead'}">
         <div class="pic">${avatarSVG(c.avatar, { size: 38 })}${c.alive ? '' : '<div class="xmark">✕</div>'}${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? `<div class="inf-badge" title="Turns in ${Math.max(0, c.infected.at + infectDelay(g) - g.stage)} turns">🦠${Math.max(0, c.infected.at + infectDelay(g) - g.stage)}${c.infected.resolved === 'restrained' ? '⛓' : ''}</div>` : ''}</div>
@@ -200,6 +207,7 @@ const SCREENS = {
         <button class="mode-opt ${streamOn() ? '' : 'on'}" data-a="setMode" data-m="solo" aria-pressed="${!streamOn()}"><b>🎮 Solo</b><span>You make every choice</span></button>
         <button class="mode-opt ${streamOn() ? 'on' : ''}" data-a="setMode" data-m="stream" aria-pressed="${streamOn()}"><b>📺 Streamer</b><span>Big text for chat, run a TikTok poll</span></button>
       </div>
+      ${streamOn() ? `<div class="safe-pick"><span>TikTok chat space at the bottom:</span>${[['none', 'None'], ['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']].map(([k, l]) => `<button class="btn small ${safeZone() === k ? 'green' : ''}" data-a="setSafe" data-k="${k}" aria-pressed="${safeZone() === k}">${l}</button>`).join('')}</div>` : ''}
       <div class="menu">
         ${sv ? `<button class="btn big green" data-a="continue">▶ Continue Adventure<small>${h(advTitle)} · Stage ${sv.stage}</small></button>` : ''}
         <button class="btn big red" data-a="newAdventure">☠ New Adventure</button>
@@ -323,7 +331,7 @@ const SCREENS = {
       <div class="story">
         ${last ? `<div class="outcome panel ${last.deaths.length ? 'bad' : last.kind === 'hurt' || last.kind === 'danger' || last.kind === 'infect' ? 'warn' : 'ok'}">
           <div class="lbl">WHAT HAPPENED · <span>${last.letter ? `${h(last.letter)}: ` : ''}${last.chaos ? '🤪 ' : ''}${h(last.choice)}</span></div>${storyHTML(last.text, party)}${(last.say || []).map((l) => sayHTML(l, party)).join('')}
-          <div class="chips">${last.gained.map((n) => `<span class="chip g">＋ ${h(n)}</span>`).join('')}${last.lost.map((n) => `<span class="chip r">－ ${h(n)}</span>`).join('')}${last.hurt.filter((n) => !last.deaths.includes(n)).map((n) => `<span class="chip r">🩸 ${h(n)} hurt</span>`).join('')}${last.healed.map((n) => `<span class="chip g">✚ ${h(n)} healed</span>`).join('')}${last.deaths.map((n) => `<span class="chip dead">☠ ${h(n)} died</span>`).join('')}</div></div>` : ''}
+          <div class="chips">${last.gained.map((n) => `<span class="chip g">＋ ${h(n)}</span>`).join('')}${last.lost.map((n) => `<span class="chip r">－ ${h(n)}</span>`).join('')}${last.hurt.filter((n) => !last.deaths.includes(n)).map((n) => `<span class="chip r">🩸 ${h(n)} hurt</span>`).join('')}${last.healed.map((n) => `<span class="chip g">✚ ${h(n)} healed</span>`).join('')}${(last.left || []).map((n) => `<span class="chip r">🎒 full: ${h(n)} left behind</span>`).join('')}${last.deaths.map((n) => `<span class="chip dead">☠ ${h(n)} died</span>`).join('')}</div></div>` : ''}
         ${cur.react ? `<p class="react">${h(cur.react)}</p>` : ''}
         <p class="narr">${h(cur.text)}</p>
         ${cur.say.map((l) => sayHTML(l, party)).join('')}
@@ -331,9 +339,10 @@ const SCREENS = {
       </div>
       ${infectedBanner(g, a)}
       ${streamOn() ? `<div class="row gap stream-tools"><button class="btn small" data-a="copyOpts">📋 Copy options for chat</button></div>` : ''}
+      <div class="time-note">⏱ Every choice takes ${a.clock?.unit || 10} min. Some take extra.</div>
       <div class="choices">${cur.choices.map((c, i) => `<button class="choice ${S.sel === i ? 'on' : ''}" data-a="pick" data-i="${i}" aria-pressed="${S.sel === i}" aria-label="Option ${L(i)}: ${h(c.label)}"><span class="num">${L(i)}</span><span class="cl">${c.special ? '<em class="unlock">★ Unlocked</em>' : ''}${c.chaos ? (c.tag === 'char' ? `<em class="chaos-tag char">⭐ ${h(party.find((p) => p.id === c.who)?.name || '')} special</em>` : '<em class="chaos-tag">🤪 Chaos option</em>') : ''}${h(c.label)}${riskHTML(c.risk)}</span></button>`).join('')}</div>
       <div class="playfoot">
-        <button class="btn pack" data-a="openPack">🎒 Backpack${invCount ? `<span class="badge">${invCount}</span>` : ''}</button>
+        <button class="btn pack" data-a="openPack">🎒 ${invCount}/${packSlots(g)}${g.inv.some((i) => itemUsable(g, a, i.id)) ? ' ✨' : ''}</button>
         <button class="btn next ${sel ? 'ready' : ''}" data-a="next" ${sel ? '' : 'disabled'}>NEXT ➜</button>
       </div>
       ${S.pack ? packHTML() : ''}
@@ -420,7 +429,7 @@ const TUT = { on: false, i: 0, prev: null, el: null };
 const TUT_STEPS = [
   { title: 'Welcome!', text: 'This quick tour shows you what everything on the game screen does. It is a pretend game, so nothing gets saved. Tap NEXT to flick through, one thing at a time.' },
   { sel: '.tb-mid', title: 'Adventure and stage', text: 'The adventure you are playing, the difficulty, and the stage number. Every decision moves the story on by one stage.' },
-  { sel: '.tb-sub', title: 'The clock ⏱', text: 'Every decision uses up time. If the clock hits zero before you reach the end, your escape leaves without you. Some options save time, others cost it.' },
+  { sel: '.tb-sub', title: 'The clock ⏱', text: 'This is how long you have left. Every choice takes 10 minutes, whatever you pick. Some options take extra time on top, and a few save time. If the clock hits zero before you reach the end, your escape leaves without you.' },
   { sel: '.heat', title: 'Noise meter 🧟', text: 'Bad outcomes make noise, and noise attracts more zombies, so every risk gets a bit worse. Calm, careful choices let the noise die down again.' },
   { sel: '.roster', title: 'Your survivors', text: 'Everyone in your group, with their health. Each person has 3 hearts ♥♥♥. An injury takes one away. At zero they die and get a red ✕. Dead is dead: they do not come back.' },
   { sel: '.roster .mini', title: 'Bitten? 🦠', text: 'If someone gets infected, a 🦠 countdown appears on their picture. Cure them, put them down, or keep them and hope you find a cure before the countdown runs out...' },
@@ -429,7 +438,8 @@ const TUT_STEPS = [
   { sel: '.narr', title: 'The story', text: 'What is happening right now. On stream, read this bit out loud.' },
   { sel: '.story .say', title: 'Character chat 💬', text: 'Your survivors talk, joke, argue and remember things that happened earlier, so every game is different. Their personality tags decide how they talk. The name on each bubble shows who is speaking.' },
   { sel: '.choices', title: 'Options A to E', text: 'Each stage gives you five options. On stream, read them out and let chat vote on a letter.' },
-  { sel: '.choice .risk', title: 'The % chances', text: 'These show the real chance of each thing happening. Green = finding an item. Orange = injury. Red = danger, so an attack may follow. Green-yellow = infection. Black = someone could die. A 20% risk really is 20%.' },
+  { sel: '.choice .risk', title: 'The % chances', text: 'These show the real chance of each thing happening. Green = finding an item. Orange = injury. Red = danger, so an attack may follow. Green-yellow = infection. Black = someone could die. A 20% risk really is 20%. The blue ⏱ label shows extra time an option takes, on top of the usual 10 minutes.' },
+  { sel: '.time-note', title: 'Time per choice ⏱', text: 'Every choice takes 10 minutes off the clock. Searching, waiting or taking the long way takes extra, shown as ⏱ +20 min extra. Quick or risky moves can save time. Running out of time ends the adventure!' },
   { sel: '.choice .chaos-tag', up: '.choice', title: 'Chaos and special options', text: '🤪 Chaos options are ridiculous ideas, like negotiating with a zombie. ⭐ Special options belong to one character, like Chris building a gadget or Hiwi taking a selfie. They really happen if you pick them. Some work brilliantly, some go horribly wrong, and 🎬 some open a whole scene where you choose what happens next.' },
   { sel: '.choice .unlock', up: '.choice', title: 'Unlocked options ★', text: 'These appear when you carry the right item or have the right person, like a Medic or an Engineer. They are often the best choice on offer.' },
   { sel: '.selected', before: () => { S.sel = S.game.cur.choices.findIndex((c) => !c.chaos); render(); }, title: 'Check your choice', text: 'Tap an option to pick it. It shows up here with its risks, so you can double-check before you commit.' },
@@ -616,13 +626,24 @@ function packHTML() {
   const sel = p.item ? g.inv.find((i) => i.id === p.item) : null;
   const d = sel ? a.items[sel.id] : null;
   return `<div class="pack-overlay"><div class="pack panel" role="dialog" aria-label="Backpack">
-    <div class="pack-head"><h2>🎒 Backpack</h2><button class="btn small" data-a="closePack">◀ BACK</button></div>
+    <div class="pack-head"><h2>🎒 Backpack <small class="slots ${g.inv.length >= packSlots(g) ? 'full' : ''}">${g.inv.length}/${packSlots(g)} slots</small></h2><button class="btn small" data-a="closePack">◀ BACK</button></div>
+    <p class="note">Space is limited. When the backpack is full, new finds get left behind. Save things for when they really matter, or drop something to make room.</p>
     ${p.msg ? `<div class="pack-msg ${p.ok ? 'ok' : 'no'}">${h(p.msg)}</div>` : ''}
-    ${g.inv.length ? `<div class="pack-grid">${g.inv.map((i) => { const it = a.items[i.id]; return `<button class="pack-item ${p.item === i.id ? 'on' : ''}" data-a="packSel" data-id="${i.id}">${iconSVG(it.icon, 36)}<span>${h(it.name)}</span>${i.qty > 1 || it.max > 1 ? `<b class="qty">×${i.qty}</b>` : ''}</button>`; }).join('')}</div>`
+    ${g.inv.length ? `<div class="pack-grid">${[...g.inv].sort((x, y) => (itemUsable(g, a, y.id) ? 1 : 0) - (itemUsable(g, a, x.id) ? 1 : 0)).map((i) => { const it = a.items[i.id]; const u = itemUsable(g, a, i.id); return `<button class="pack-item ${p.item === i.id ? 'on' : ''} ${u ? 'usable' : 'dull'}" data-a="packSel" data-id="${i.id}" aria-label="${h(it.name)}${u ? ', can be used now' : ', nothing to use it on right now'}">${iconSVG(it.icon, 36)}<span>${h(it.name)}</span>${i.qty > 1 || it.max > 1 ? `<b class="qty">×${i.qty}</b>` : ''}${u ? '<i class="use-dot">✨</i>' : ''}</button>`; }).join('')}</div>`
       : `<p class="note">Your backpack is empty. Search places to find items.</p>`}
-    ${d ? `<div class="pack-detail">${iconSVG(d.icon, 48)}<div><b>${h(d.name)}</b> <small>${sel.qty > 1 || d.max > 1 ? `(${sel.qty} ${d.tags?.includes('gun') ? 'rounds' : 'left'})` : ''}</small><p>${h(d.desc)}</p></div></div>
-      ${p.confirm ? `<div class="confirm"><p>Use <b>${h(d.name)}</b> now?</p><div class="row gap"><button class="btn green" data-a="useYes">✔ Yes, use it</button><button class="btn" data-a="useNo">✕ No</button></div></div>` : `<button class="btn big green" data-a="useAsk">USE</button>`}` : g.inv.length ? '<p class="note">Tap an item to see what it does.</p>' : ''}
+    ${d ? `<div class="pack-detail ${itemUsable(g, a, sel.id) ? '' : 'dull'}">${iconSVG(d.icon, 48)}<div><b>${h(d.name)}</b> <small>${sel.qty > 1 || d.max > 1 ? `(${sel.qty} ${d.tags?.includes('gun') ? 'rounds' : 'left'})` : ''}</small><p>${h(d.desc)}</p></div></div>
+      ${usableHint(g, a, sel.id)}
+      ${p.confirm === 'drop' ? `<div class="confirm"><p>Drop <b>${h(d.name)}</b> and leave it behind for good?</p><div class="row gap"><button class="btn red" data-a="dropYes">🗑 Yes, drop it</button><button class="btn" data-a="useNo">✕ No</button></div></div>`
+    : p.confirm ? `<div class="confirm"><p>Use <b>${h(d.name)}</b> now?</p><div class="row gap"><button class="btn green" data-a="useYes">✔ Yes, use it</button><button class="btn" data-a="useNo">✕ No</button></div></div>`
+    : `<div class="row gap"><button class="btn big green" data-a="useAsk">USE</button><button class="btn" data-a="dropAsk">🗑 Drop</button></div>`}` : g.inv.length ? '<p class="note">Tap an item to see what it does.</p>' : ''}
   </div></div>`;
+}
+
+function usableHint(g, a, id) {
+  const u = itemUsable(g, a, id);
+  if (!u) return `<p class="use-hint no">Nothing to use this on right now. Save it for when it really matters.</p>`;
+  const msg = { option: `This unlocks option ${L(u.i)} right now. Pick that option to use it.`, here: '✨ Something might happen if you use this here...', heal: 'Someone is hurt. This can patch them up.', recharge: 'This can recharge something you are carrying.', cure: 'Someone is infected. This can cure them!', mercy: 'Someone is infected. A weapon can put them down: tap their picture to choose.' }[u.why];
+  return `<p class="use-hint yes">${h(msg)}</p>`;
 }
 
 function diffNow() { return DIFFICULTY[S.settings?.difficulty] ? S.settings.difficulty : 'medium'; }
@@ -641,6 +662,7 @@ const A = {
     modal('Add to Home Screen', `<ol class="install-steps">${steps.map(([ic, t], i) => `<li><span class="step-n">${i + 1}</span><span class="step-ic">${ic}</span><span>${t}</span></li>`).join('')}</ol><p class="note">The game then opens full screen from the zombie icon, like a normal app. Your characters are saved separately there, so use <b>Export</b> in the Character Library to bring them across.</p>`, [{ label: 'Got it', cls: 'green' }]);
   },
   go: (d) => go(d.to),
+  setSafe(d) { S.settings.safe = d.k; S.store?.setSettings(S.settings).catch(() => {}); render(); toast(d.k === 'none' ? 'No chat space kept free.' : `Keeping a ${d.k} space free for TikTok chat.`); },
   spage(d) { S.spage = d.p === 'vote' ? 'vote' : 'story'; render(); window.scrollTo(0, 0); },
   tutorial: () => startTutorial(),
   setMode(d) { S.settings.mode = d.m === 'stream' ? 'stream' : 'solo'; applySettings(); S.store?.setSettings(S.settings).catch(() => {}); render(); toast(streamOn() ? '📺 Streamer mode on.' : '🎮 Solo mode on.'); },
@@ -775,6 +797,14 @@ const A = {
   openPack() { S.pack = { item: null, confirm: false, msg: '' }; render(); },
   closePack() { S.pack = null; render(); },
   packSel(d) { S.pack = { item: d.id, confirm: false, msg: '' }; render(); },
+  dropAsk() { if (S.pack) { S.pack.confirm = 'drop'; render(); } },
+  async dropYes() {
+    const id = S.pack?.item; if (!id) return;
+    const name = S.adv.items[id].name;
+    dropItem(S.game, S.adv, id);
+    S.pack = { item: null, confirm: false, msg: `Dropped ${name}. One slot free.`, ok: true };
+    await save(); render();
+  },
   useAsk() { S.pack.confirm = true; S.pack.msg = ''; render(); },
   useNo() { S.pack.confirm = false; render(); },
   async useYes() {

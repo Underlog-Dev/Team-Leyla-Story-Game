@@ -29,8 +29,12 @@ export function search(l, d, { item = 0.5, hurt = 0.12, danger = 0, time = -1, t
 }
 
 // Careful / safe: no risk, may cost time, may grant a small flag.
-export function safe(l, d, { t, time = -1, fx = [], extra = {} } = {}) {
-  return C(l, d, [O(1, 'neutral', t || POOL.safe, [['time', time], ...fx])], extra);
+// Careful options cost a little extra time by default, unless they are about
+// moving on straight away ("Keep moving", "No time", "Move on").
+const MOVING_ON = /\b(keep moving|move on|no time|leave it|go now|steady pace|no rest)\b/i;
+export function safe(l, d, { t, time, fx = [], extra = {} } = {}) {
+  if (time === undefined) time = MOVING_ON.test(l) ? 0 : -1;
+  return C(l, d, [O(1, 'neutral', t || POOL.safe, time ? [['time', time], ...fx] : fx)], extra);
 }
 
 // Rush / risky: saves time, chance of injury or danger.

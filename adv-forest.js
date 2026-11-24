@@ -955,7 +955,7 @@ export default addComedy({
   finale: [`${A}_fin_approach`, `${A}_fin_beacon`], finaleLoc: 'station',
   emergencies: [`${A}_em_lunge`, `${A}_em_grab`, `${A}_em_surround`],
   turnEvent: `${A}_inf_turned`, revealEvent: `${A}_inf_reveal`, cureItem: 'antidote', timeoutEvent: `${A}_timeout`, fillerEvent: `${A}_filler`,
-  startKit: { easy: [['hatchet'], ['rifle', 2], ['first_aid'], ['bandages', 2], ['flashlight']], medium: [['bandages', 1], ['trail_mix', 1]], hard: [] },
+  startKit: { easy: [['hatchet'], ['first_aid'], ['bandages', 1]], medium: [['bandages', 1]], hard: [] },
   npcs: {
     pemberton: { name: `Pemberton`, traitor: 0.08, loyal: 0.6, hair: '#9b9aa3', hat: 'wide', hatC: '#8a7a4a', shirt: '#8a7a4a', legs: '#5c4b3b' },
     wade: { name: `Wade`, traitor: 0.45, loyal: 0.25, skin: '#dc9c6e', hair: '#3b2417', hat: 'cap', hatC: '#f77f00', shirt: '#5b6b2f', legs: '#3d4f22', beard: '#3b2417' },

@@ -14,15 +14,15 @@ export const ROLES = {
   Medic: 'Healing items heal 1 extra. Can sometimes save someone from dying of their wounds.',
   Engineer: 'Unlocks repair and build options. Fewer injuries from hazards.',
   Fighter: 'When zombies attack, deaths and infections are less likely.',
-  Scout: 'Finds items more often when searching.',
+  Scout: 'Finds items a bit more often when searching.',
   Leader: 'Keeps the group calm: noise builds up more slowly.',
   Athlete: 'Harder to catch: much less likely to be bitten when attacked.',
 };
 
 export const DIFFICULTY = {
-  easy: { label: 'Easy', danger: 0.85, death: 0.75, item: 1.25, clock: 10, infect: 6, cureFind: 0.24, ambient: 0.04, blurb: 'Enjoy the story. Start with weapons and supplies, more time, gentler odds, cures easier to find. People can still die.' },
-  medium: { label: 'Medium', danger: 1, death: 1, item: 1, clock: 0, infect: 6, cureFind: 0.14, ambient: 0.06, blurb: 'The intended challenge. A few basics to start with.' },
-  hard: { label: 'Hard', danger: 1.45, death: 1.9, item: 0.7, clock: -8, infect: 6, cureFind: 0.07, ambient: 0.13, blurb: 'Brutal. An empty backpack, less time, cures are rare. Possible, barely.' },
+  easy: { label: 'Easy', danger: 0.85, death: 0.75, item: 1.05, slots: 7, clock: 10, infect: 6, cureFind: 0.24, ambient: 0.04, blurb: 'Enjoy the story. Start with a weapon and some first aid, more time, gentler odds, cures easier to find. People can still die.' },
+  medium: { label: 'Medium', danger: 1, death: 1, item: 0.85, slots: 6, clock: 0, infect: 6, cureFind: 0.14, ambient: 0.06, blurb: 'The intended challenge. A few basics to start with.' },
+  hard: { label: 'Hard', danger: 1.45, death: 1.9, item: 0.6, slots: 5, clock: -8, infect: 6, cureFind: 0.07, ambient: 0.13, blurb: 'Brutal. An empty backpack, less time, cures are rare. Possible, barely.' },
 };
 const diffOf = (s) => DIFFICULTY[s.diff] || DIFFICULTY.medium;
 export function infectDelay(s) { return diffOf(s).infect; }
@@ -249,7 +249,7 @@ export function effectiveOutcomes(s, adv, outcomes, ev) {
   if (em && hasRole(s, 'Fighter')) { m.death *= 0.65; m.infect *= 0.65; m.hurt *= 0.85; }
   if (em) { const t = charById(s, s.cur?.cast?.t || ''); if (t && t.alive && t.role === 'Athlete') m.death *= 0.5; }
   if (ev && ev.cat === 'hazard' && hasRole(s, 'Engineer')) m.hurt *= 0.75;
-  let itemMul = D.item * (hasRole(s, 'Scout') ? 1.25 : 1);
+  let itemMul = D.item * (hasRole(s, 'Scout') ? 1.15 : 1);
   const T = os.reduce((a, o) => a + o.p, 0);
   for (const o of os) { if (BAD_KINDS.has(o.k)) o.p *= m[o.k]; else if (o.k === 'item') o.p *= itemMul; }
   // renormalise: keep the bad share (capped), share the rest among the good outcomes
@@ -280,7 +280,7 @@ export function effectiveOutcomes(s, adv, outcomes, ev) {
   return os;
 }
 
-export function riskSummary(os) {
+export function riskSummary(os, adv) {
   const T = os.reduce((a, o) => a + o.p, 0) || 1;
   const sum = (k) => os.filter((o) => o.k === k).reduce((a, o) => a + o.p, 0) / T;
   const out = [];
@@ -291,6 +291,12 @@ export function riskSummary(os) {
   if (pct(danger)) out.push({ k: 'danger', label: `${pct(danger)}% danger`, p: danger });
   if (pct(infect)) out.push({ k: 'infect', label: `${pct(infect)}% infection`, p: infect });
   if (pct(death)) out.push({ k: 'death', label: `${pct(death)}% fatal`, p: death });
+  // time: what this option usually costs (or saves) on top of the normal 10 minutes
+  if (adv) {
+    const t = os.reduce((a, o) => a + o.p * (o.fx || []).filter((f) => f[0] === 'time').reduce((x, f) => x + f[1], 0), 0) / T;
+    const mins = Math.round((Math.abs(t) * (adv.clock?.unit || 10)) / 5) * 5;
+    if (mins >= 5) out.push({ k: 'time', label: t < 0 ? `⏱ +${mins} min extra` : `⏱ saves ${mins} min`, p: 0 });
+  }
   return out;
 }
 
@@ -403,13 +409,13 @@ function renderEvent(s, adv, e, cast) {
     const trust = c.o.some((o) => o.loyalty);
     const sp = spread(s);
     const tag = (rk) => rk.map((x) => (x.k === 'hurt' && sp.hurt >= 0.5 ? { ...x, label: x.label + ' (several)' } : x.k === 'danger' && sp.em >= 0.5 ? { ...x, label: x.label + ' (more may come)' } : x));
-    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : tag(riskSummary(os)), special: !!c.badge || !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion || c.req.mem)) };
+    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : tag(riskSummary(os, adv)), special: !!c.badge || !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion || c.req.mem)) };
   });
   if (chaos) {
     const os = effectiveOutcomes(s, adv, chaos.x.o, e);
     const sp = spread(s);
     const spreads = chaos.x.o.some((o) => (o.fx || []).some((f) => f[0] === 'hurt' && f[1] === 'r'));
-    const rk = riskSummary(os).map((x) => (x.k === 'hurt' && spreads && sp.hurt >= 0.5 ? { ...x, label: x.label + ' (several)' } : x));
+    const rk = riskSummary(os, adv).map((x) => (x.k === 'hurt' && spreads && sp.hurt >= 0.5 ? { ...x, label: x.label + ' (several)' } : x));
     const scene = chaos.x.o.some((o) => (o.fx || []).some((f) => f[0] === 'nextcx'));
     if (scene) rk.push({ k: 'scene', label: '🎬 opens a scene', p: 0 });
     choices[chaos.slot] = { i: -1, chaos: chaos.x.id, tag: chaos.x.tag || 'chaos', who: cast.v, label: fill(s, adv, chaos.x.l, ctx), desc: fill(s, adv, chaos.x.d, ctx), risk: rk, special: false };
@@ -552,10 +558,13 @@ function die(s, c, cause, ctx) {
 }
 function adv_locName(s, ctx) { return ctx.adv?.locations[s.loc]?.name || ''; }
 
+export function packSlots(s) { return (DIFFICULTY[s.diff] || DIFFICULTY.medium).slots || 6; }
 function addItem(s, adv, id, qty, ctx) {
   const d = adv.items[id];
   if (!d) return false;
   const e = s.inv.find((i) => i.id === id);
+  // the backpack only has so many slots: a new kind of item needs a free one
+  if (!e && s.inv.length >= packSlots(s) && ctx.resolving && id !== adv.cureItem) { ctx.leftBehind = (ctx.leftBehind || []).concat(d.name); ctx.itemName = d.name; return true; }
   const q = qty || d.qty || 1;
   if (e) { if (d.unique) return false; e.qty = Math.min(d.max || 99, e.qty + q); }
   else s.inv.push({ id, qty: q });
@@ -571,7 +580,9 @@ function lootFor(s, adv, ctx) {
   const table = (L && L.loot) || adv.defaultLoot;
   const cands = table.filter((id) => { const d = adv.items[id]; if (!d) return false; const q = invQty(s, id); return !(d.unique && q > 0) && q < (d.max || 99); });
   const id = cands.length ? r.pick(cands) : r.pick(adv.defaultLoot);
-  if (!addItem(s, adv, id, 0, ctx)) { addItem(s, adv, adv.defaultLoot[0], 0, ctx); }
+  // finds are single items: stacks only come from special places
+  const q = Math.min(adv.items[id]?.qty || 1, adv.items[id]?.tags?.includes('gun') ? 2 : 1);
+  if (!addItem(s, adv, id, q, ctx)) { addItem(s, adv, adv.defaultLoot[0], 1, ctx); }
 }
 
 function consume(s, id, n = 1) {
@@ -675,6 +686,7 @@ function resolveOutcome(s, adv, ev, o, label, meta = {}) {
   }
   if (ctx.extraHurt.length) { const n = ctx.extraHurt.map((id) => nameOf(s, id)); text += ` In the chaos, ${listNames(n)} ${n.length > 1 ? 'are' : 'is'} hurt too.`; }
   if (ctx.wave) text += ` And ${ctx.wave > 1 ? 'more of them are' : 'another one is'} coming.`;
+  if (ctx.leftBehind) text += ` But the backpack is full (${packSlots(s)} slots), so the ${listNames(ctx.leftBehind)} had to be left behind.`;
   // noise: bad outcomes draw more infected; quiet choices let it settle
   const bad = ['hurt', 'danger', 'death', 'infect'].includes(o.k);
   const calm = hasRole(s, 'Leader') ? 0.55 : 1;
@@ -697,7 +709,7 @@ function resolveOutcome(s, adv, ev, o, label, meta = {}) {
   }
   const H = { alive, fill, r };
   const rsay = s.bt ? reactionBanter(s, adv, H, { kind: o.k, cat: ev?.cat, chaos: !!meta.chaos, searched: !!meta.searched, hurtId: ctx.hurt.find((id) => charById(s, id)?.alive), itemName: ctx.gained.length ? adv.items[ctx.gained[0]].name : '', deaths: ctx.deaths.length > 0 }) : [];
-  s.last = { choice: label, text, say: rsay, chaos: !!meta.chaos, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), kind: o.k };
+  s.last = { choice: label, text, say: rsay, chaos: !!meta.chaos, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), left: ctx.leftBehind || [], kind: o.k };
   s.clock -= 1;
   s.zoneStages++;
   const wasFinale = ev && ev.cat === 'finale';
@@ -727,6 +739,39 @@ export function findItemUse(s, adv, itemId) {
   if (!ev || !d || !ev.uses) return null;
   const keys = [itemId, ...(d.tags || [])];
   for (const k of keys) { const u = ev.uses[k]; if (u && reqOK(s, adv, u.req)) return u; }
+  return null;
+}
+
+// Make room in the backpack. Dropping does not use up a stage.
+export function dropItem(s, adv, itemId) {
+  const e = s.inv.find((i) => i.id === itemId);
+  if (!e) return false;
+  s.inv = s.inv.filter((i) => i !== e);
+  s.log.itemsUsed.push({ stage: s.stage, item: itemId, name: adv.items[itemId].name, dropped: true });
+  return true;
+}
+
+// Can this item do something right now? Used to show usable items in colour.
+// Returns a short reason, or null if it would do nothing here.
+export function itemUsable(s, adv, itemId) {
+  if (s.finished || !hasItem(s, itemId)) return null;
+  const d = adv.items[itemId];
+  if (!d) return null;
+  const tags = d.tags || [];
+  // unlocks one of the options on screen
+  const ev = currentEventDef(s, adv);
+  const opt = (s.cur?.choices || []).findIndex((c) => {
+    if (c.i < 0 || !ev?.choices?.[c.i]) return false;
+    const q = ev.choices[c.i].req || {};
+    return arr(q.items).includes(itemId) || arr(q.tags).some((t) => tags.includes(t)) || (q.anyItems && arr(q.anyItems).some((t) => tags.includes(t)));
+  });
+  if (opt >= 0) return { why: 'option', i: opt };
+  if (findItemUse(s, adv, itemId)) return { why: 'here' };
+  if (d.anytime === 'heal' && alive(s).some((c) => c.hp < MAX_HP)) return { why: 'heal' };
+  if (d.anytime === 'recharge' && hasItem(s, d.target)) return { why: 'recharge' };
+  const sick = alive(s).some((c) => c.infected && !['cured', 'dead'].includes(c.infected.resolved));
+  if (d.anytime === 'cure' && sick) return { why: 'cure' };
+  if (sick && tags.some((t) => t === 'melee' || t === 'gun')) return { why: 'mercy' };
   return null;
 }
 
