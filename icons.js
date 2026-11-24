@@ -4,6 +4,7 @@ const PAL = {
   n: '#8d5524', N: '#5e3b23', G: '#2a9d8f', l: '#90be6d', p: '#c77dff', s: '#f4a261', c: '#a8dadc', e: '#e9c46a', m: '#b5838d',
 };
 const ICONS = {
+  duck: ['..........', '..yyy.....', '.ykyy.....', 'ooyyy.....', '..yyy...y.', '.yyyyyyyy.', '.yyyyyyyy.', '..yyyyyy..', '..........', '..........'],
   torch: ['..........', '......yy..', '.....yyyy.', '..ddddyy..', '.ddddddy..', 'dddddd....', 'gdddd.....', 'gg........', '..........', '..........'],
   lantern: ['....kk....', '...k..k...', '..dddddd..', '..dyyyyd..', '..dyooyd..', '..dyooyd..', '..dyyyyd..', '..dddddd..', '...dddd...', '..........'],
   battery: ['..........', '....gg....', '..dddddd..', '..dyyyyd..', '..dyyyyd..', '..dddddd..', '..dkkkkd..', '..dkkkkd..', '..dddddd..', '..........'],

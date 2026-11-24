@@ -1,4 +1,5 @@
 // ADVENTURE 1: LAST TRAIN OUT — zombie-infested city, reach Stonebridge Station.
+import { addComedy } from './chaos.js';
 import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue, infectionEvents, roleEvents } from './kit.js';
 
 const A = 'lto';
@@ -1011,7 +1012,8 @@ const T = travelTables({
   danger: [`Halfway there, an infected staggers out of a doorway at {r}!`, `On the way, something lurches from between two cars at {r}!`, `A bus shelter is not empty. Something inside reaches for {r}!`, `A shop alarm goes off and a figure bursts out, straight at {r}!`, `Turning a corner, {r} walks right into one of them!`],
 });
 
-export default {
+export default addComedy({
+  words: { z: 'zombie', zs: 'zombies', goal: 'the train', place: 'city', critter: 'pigeon' },
   id: A, title: `Last Train Out`, short: `City`,
   tagline: `The city has fallen. One train is leaving.`,
   premise: `The outbreak has overwhelmed the city. The military is preparing to evacuate the last survivors from Stonebridge Station, and the final train will not wait for anyone.`,
@@ -1062,4 +1064,4 @@ export default {
     { id: 'failed', title: `Left Behind`, cat: 'Failed evacuation', objective: false, when: (c) => c.timeout || c.flag('stranded'), text: `The last train left without them. {survivors} are still out there in the city, surviving day by day, listening for helicopters that may never come.` },
     { id: 'lost', title: `Lost in the City`, cat: 'Tragic ending', objective: false, when: () => true, text: `The journey ended before Stonebridge. {survivors} remain somewhere in the city.` },
   ],
-};
+});

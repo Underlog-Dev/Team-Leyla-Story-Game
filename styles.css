@@ -333,3 +333,27 @@ body[data-mode="stream"] .choice .num { font-size: 18px; padding: 8px 10px; min-
 .dc-avs .px-avatar { filter: grayscale(.7) brightness(.7); }
 .dc-avs .xmark { font-size: 64px; }
 .dc-title { font-family: var(--title); font-size: 16px; color: var(--red); line-height: 1.5; text-shadow: 3px 3px 0 #000; }
+
+/* ---------- banter and chaos ---------- */
+.aside { font-style: italic; color: var(--dim); margin: 6px 0 6px 6px; }
+.outcome .say div { background: #241f35; }
+.outcome p { margin: 6px 0; }
+.chaos-tag { display: inline-block; width: fit-content; align-self: flex-start; font-style: normal; font-size: .72em; color: #1a1208; background: #ff9f1c; padding: 1px 6px; margin-right: 6px; }
+
+/* ---------- tutorial ---------- */
+.tut { position: fixed; inset: 0; z-index: 80; }
+.tut-hole { position: fixed; border: 3px solid var(--yellow); box-shadow: 0 0 0 9999px rgba(5, 4, 10, .74); pointer-events: none; transition: all .25s ease-out; animation: tutpulse 1.4s ease-in-out infinite; }
+@keyframes tutpulse { 50% { border-color: #fff; } }
+.tut-arrow { position: fixed; width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; z-index: 81; }
+.tut-arrow.up { border-bottom: 14px solid var(--yellow); animation: tutbob .8s ease-in-out infinite alternate; }
+.tut-arrow.down { border-top: 14px solid var(--yellow); animation: tutbob2 .8s ease-in-out infinite alternate; }
+@keyframes tutbob { to { transform: translateY(-4px); } }
+@keyframes tutbob2 { to { transform: translateY(4px); } }
+.tut-box { position: fixed; z-index: 82; border: 3px solid var(--yellow); background: #1d1930; max-width: 520px; margin: 0 auto; }
+.tut-box h3 { font-family: var(--title); font-size: 13px; color: var(--yellow); margin: 2px 0 8px; line-height: 1.5; }
+.tut-box p { margin: 0 0 10px; }
+.tut-count { float: right; font-size: .75em; color: var(--dim); }
+.tut-btns { display: flex; gap: 8px; }
+.tut-btns .btn { flex: 1; }
+.chaos-tag.char { background: #7b5cff; color: #fff; }
+.rk.scene { background: #3a2a63; color: #e7dcff; }

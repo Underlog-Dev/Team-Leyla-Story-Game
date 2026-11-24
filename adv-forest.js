@@ -1,4 +1,5 @@
 // ADVENTURE 2: DEADWOOD FOREST — wilderness outbreak, reach the ranger station beacon.
+import { addComedy } from './chaos.js';
 import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue, infectionEvents, roleEvents } from './kit.js';
 
 const A = 'dwf';
@@ -428,7 +429,7 @@ const events = [
       C(`Take an autoinjector`, `"Post-exposure." It might stop an infection.`, [O(1, 'item', `One autoinjector, carefully wrapped: {loot}.`, [['item', 'antidote']])]),
       C(`Take the classified files`, `The world needs to know what happened here.`, [O(1, 'item', `{a} stuffs the folder into the backpack. It explains everything.`, [['item', 'files'], ['flag', 'has_files']])]),
       C(`Grab everything and run`, `Greedy and risky.`, [O(0.55, 'item', `Fuse, injector, files. Everything. And out before anything stirs.`, [['item', 'fuse'], ['item', 'antidote'], ['item', 'files'], ['flag', 'has_files']]), O(0.45, 'danger', `The cages were not all empty. Something lunges for {r} as {team} grabs the last box.`, [['item', 'fuse'], ['item', 'antidote'], ['item', 'files'], ['flag', 'has_files'], ['em', 'r']])]),
-      safe(`Leave it all and get out`, `This place is cursed.`, { t: `{Team} backs out of the lab. The door clangs shut behind them.` }),
+      C(`Seal the door and stay here for good`, `Forget the beacon. This place has air, water and a steel door.`, [O(1, 'good', `{Team} decides. No more running. The steel door swings shut and the bolts slide home, one by one.`, [['flag', 'bunker_haven'], ['end']])], { major: true }),
     ],
   }),
 
@@ -940,7 +941,8 @@ const T = travelTables({
   danger: [`Halfway there, an infected lurches out from behind a trunk at {r}!`, `On the way, something bursts from the bracken at {r}!`, `A shape drops out of a low tree right next to {r}!`, `Something was lying in the stream. It rises as {r} crosses.`, `An infected camper staggers out of a tent at {r}!`],
 });
 
-export default {
+export default addComedy({
+  words: { z: 'zombie', zs: 'zombies', goal: 'the beacon', place: 'forest', critter: 'crow' },
   id: A, title: `Deadwood Forest`, short: `Forest`,
   tagline: `A camping trip. A dead forest. One way out.`,
   premise: `A peaceful camping trip turns into a nightmare when the group discovers the surrounding forest is infected. The great horde is sweeping through the valley, and the only way to call for rescue is the emergency beacon at the ranger station.`,
@@ -988,4 +990,4 @@ export default {
     { id: 'overrun', title: `Overrun`, cat: 'Failed rescue', objective: false, when: (c) => c.timeout || c.flag('overrun'), text: `The forest was overrun before the beacon could call for help. {survivors} are still out there among the trees, moving from hiding place to hiding place.` },
     { id: 'lost', title: `Lost in the Trees`, cat: 'Tragic ending', objective: false, when: () => true, text: `The journey ended before the ranger station. {survivors} remain somewhere in the forest.` },
   ],
-};
+});

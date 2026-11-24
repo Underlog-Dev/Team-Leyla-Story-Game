@@ -2,6 +2,10 @@
 // seeded Rng whose state lives in the game state, so saves resume exactly.
 import { Rng, hashSeed } from './rng.js';
 import { POOL } from './kit.js';
+import { initBanter, remember, sceneBanter, griefBanter, reactionBanter } from './banter.js';
+import { CHAOS_BY_ID, SITUATION, ZNAMES } from './chaos.js';
+import { characterOptions, OPTION_BY_ID, personaKey, petOf, signLine } from './persona.js';
+const optionById = (id) => CHAOS_BY_ID[id] || OPTION_BY_ID[id];
 
 export const MAX_HP = 3;
 export const MAX_PARTY = 6;
@@ -55,23 +59,24 @@ export function progressOf(s, adv) {
 }
 
 // ---------- new game ----------
-export function newGame(adv, characters, seed, { replay = null, useReplay = true, difficulty = 'medium' } = {}) {
+export function newGame(adv, characters, seed, { replay = null, useReplay = true, difficulty = 'medium', today = null } = {}) {
   if (!characters.length) throw new Error('Select at least one character');
   characters = characters.slice(0, MAX_PARTY);
   const s = {
     v: 1, adv: adv.id, seed, rng: hashSeed(seed + ':' + adv.id), stage: 1,
-    party: characters.map((c) => ({ id: c.id, name: c.name, avatar: c.avatar, role: c.role || null, traits: [...(c.role ? [c.role] : []), ...(c.traits || [])], hp: MAX_HP, alive: true, involve: 0, danger: 0, infected: null, cause: null, diedAt: null })),
+    party: characters.map((c) => ({ id: c.id, name: c.name, avatar: c.avatar, description: c.description || '', role: c.role || null, traits: [...(c.role ? [c.role] : []), ...(c.traits || [])], hp: MAX_HP, alive: true, involve: 0, danger: 0, infected: null, cause: null, diedAt: null })),
     inv: [], flags: {}, npcs: [], loc: adv.zones[0][0], zone: 0, zoneStages: 0, zoneQuota: adv.zoneQuota ? adv.zoneQuota[0][0] : 3,
     diff: DIFFICULTY[difficulty] ? difficulty : 'medium', heat: 0,
     clock: adv.clock.start + (DIFFICULTY[difficulty]?.clock || 0), seen: [], pending: [], cur: null, last: null, lastCat: null, lastEm: null, recentDeaths: [],
     log: { decisions: [], discoveries: [], itemsUsed: [], funny: [], heroic: [], deaths: [], locations: [adv.zones[0][0]] },
-    finished: false, ending: null, phase: 'normal', rw: {}, started: Date.now(), npcData: {},
+    finished: false, ending: null, phase: 'normal', rw: {}, started: Date.now(), npcData: {}, today,
   };
   if (replay && useReplay) s.rw = replayWeights(adv, replay);
   const r = rngOf(s);
   // zone quotas decided by the seed
   s.quotas = adv.zones.map((z, i) => { const q = adv.zoneQuota?.[i] || [3, 5]; return r.range(q[0], q[1]); });
   s.zoneQuota = s.quotas[0];
+  initBanter(s, r); s.bt.zname = r.pick(ZNAMES);
   for (const [id, q] of (adv.startKit?.[s.diff] || [])) { const d = adv.items[id]; if (d) s.inv.push({ id, qty: q || d.qty || 1 }); }
   const opening = r.weighted(adv.events.filter((e) => e.cat === 'opening' && reqOK(s, adv, e.req) && castable(s, e)), (e) => (e.w || 1) * (s.rw[e.id] ?? 1));
   s.pending.push({ id: opening.id });
@@ -97,6 +102,14 @@ function reqOK(s, adv, req) {
   if (req.minClock !== undefined && s.clock < req.minClock) return false;
   if (req.minStage && s.stage < req.minStage) return false;
   if (req.companion && !companionsFor(s, adv, req).length) return false;
+  // memories of earlier moments in this game (who did what)
+  const M = s.bt?.mem || {};
+  const memAlive = (k) => { const m = M[k]; return m && s.party.find((c) => c.id === m.who)?.alive; };
+  if (req.mem && !arr(req.mem).every(memAlive)) return false;
+  if (req.memOk && !(memAlive(req.memOk) && M[req.memOk].ok)) return false;
+  for (const k of arr(req.nomem)) if (M[k]) return false;
+  if (req.memAge && !(M[req.memAge[0]] && s.stage - M[req.memAge[0]].stage >= req.memAge[1])) return false;
+  if (req.anyInv && !s.inv.some((i) => i.qty > 0)) return false;
   if (req.npcIs) { const d = s.npcData?.[req.npcIs[0]]; if (!s.npcs.includes(req.npcIs[0]) || !d || !arr(req.npcIs[1]).includes(d.loyalty)) return false; }
   return true;
 }
@@ -177,7 +190,17 @@ export function fill(s, adv, text, ctx = {}) {
   if (Array.isArray(text)) text = text.length > 1 ? pickVariant(s, text) : text[0];
   if (!text) return '';
   const al = alive(s);
-  return String(text).replace(/\{(\w+)\}/g, (m, k) => {
+  const W = adv.words || {};
+  return String(text).replace(/\{(@?\w+)\}/g, (m, k) => {
+    if (ctx.tok && ctx.tok[k] !== undefined && ctx.tok[k] !== '') return String(ctx.tok[k]);
+    if (k[0] === '@') return nameOf(s, s.bt?.mem?.[k.slice(1)]?.who);
+    if (k === 'z' || k === 'zs' || k === 'goal' || k === 'place' || k === 'critter') return W[k] || k;
+    if (k === 'Z' || k === 'Zs') { const w = W[k.toLowerCase()] || 'zombie'; return w[0].toUpperCase() + w.slice(1); }
+    if (k === 'zname') return s.bt?.zname || 'Kevin';
+    if (k === 'signs') return signLine(s) || 'Nobody actually knows anyone\'s birthday. Suspicious.';
+    if (k === 'pet' || k === 'pettype') { const c = charById(s, ctx.cast?.v || ctx.cast?.me || ctx.me); const p = petOf(c || {}); return k === 'pet' ? p.pet : p.type; }
+    if (k === 'weapon') { const it = s.inv.find((i) => i.qty > 0 && (adv.items[i.id]?.tags || []).some((t) => t === 'melee' || t === 'gun')); return it ? adv.items[it.id].name.toUpperCase() : 'BIG STICK'; }
+    if (k === 'snack') { const id = ctx.cast?.me || ctx.cast?.b || ctx.cast?.a; return s.bt?.snack?.[id] || 'biscuits'; }
     if (k === 'team') return al.length === 1 ? al[0].name : 'the group';
     if (k === 'Team') return al.length === 1 ? al[0].name : 'The group';
     if (k === 'loc') return adv.locations[s.loc]?.name || '';
@@ -279,6 +302,53 @@ function pickChoices(s, adv, e, cast = {}) {
   return idx;
 }
 
+// Options that move the story along (endings, chains, companions) are never swapped out.
+const STORY_FX = new Set(['flag', 'next', 'later', 'npc', 'end', 'cure', 'npcleave']);
+// Sometimes one normal option is swapped for a ridiculous one.
+function pickChaos(s, adv, e, cast, ci) {
+  const sit = SITUATION[e.cat];
+  if (!sit || !adv.chaos || e.companion || e.fewChoices || ci.length < 5 || s.stage <= 1 || e.id.includes('_cx_')) return null;
+  if (e.choices.some((c) => c.o.some((o) => o.loyalty))) return null;
+  const r = rngOf(s);
+  let rate = sit === 'em' ? 0.3 : 0.42;
+  if (s.stage - (s.bt.lastChaos ?? -9) <= 1) rate *= 0.4;
+  if (!r.chance(rate)) return null;
+  const al = alive(s);
+  const sceneSeen = (x) => x.o.some((o) => (o.fx || []).some((f) => f[0] === 'nextcx' && (s.seen.includes(`${adv.id}_cx_ch_${f[1]}`) || s.pending.some((p) => p.id === `${adv.id}_cx_ch_${f[1]}`))));
+  const fits = (x) => (x.sits.includes(sit) || (e.cat === 'humour' && x.sits.includes('people'))) && reqOK(s, adv, x.req) && (sit !== 'em' || cast.t) && !sceneSeen(x);
+  s.bt.copt ||= {};
+  const pool = [
+    ...adv.chaos.filter((x) => fits(x) && (!x.notT || al.length >= 2)).map((x) => ({ x, who: null })),
+    // decisions tied to a specific, living character (and not too often for the same person)
+    ...characterOptions(s).filter(({ x, who }) => fits(x) && !(x.notT && who === cast.t) && s.stage - (s.bt.copt[who] ?? -9) >= 4),
+  ];
+  const words = (t) => String(t).toLowerCase().replace(/\{\w+\}/g, '').match(/[a-z]{4,}/g) || [];
+  const have = ci.map((i) => new Set(words(e.choices[i].l)));
+  const pool2 = pool.filter(({ x }) => { const w = words(x.l); return !have.some((h) => w.filter((k) => h.has(k)).length >= Math.max(2, Math.ceil(w.length * 0.6))); });
+  if (!pool2.length) return null;
+  const { x, who } = r.weighted(pool2, ({ x, who }) => (who ? 1.4 : x.w || 1) / (1 + 3 * (s.bt.chaosSeen[x.id] || 0)));
+  // the volunteer is named on the option, so chat knows who they are sending
+  if (who) { cast.v = who; s.bt.copt[who] = s.stage; }
+  else {
+    const cands = al.filter((c) => !(x.notT && c.id === cast.t));
+    if (!cands.length) return null;
+    cast.v = r.weighted(cands, (c) => (1 / (1 + c.involve * 0.5)) * ((x.vpref || []).some((t) => hasTrait(c, t)) ? 4 : 1) * ((x.vpersona || []).includes(personaKey(c)) ? 8 : 1)).id;
+  }
+  // replace one option, but never the safest one
+  let slot;
+  if (e.cat === 'travel') slot = ci.length - 1;
+  else {
+    const bad = ci.map((i) => { const c = e.choices[i]; if (c.req || c.o.some((o) => (o.fx || []).some((f) => STORY_FX.has(f[0])))) return -1; const os = effectiveOutcomes(s, adv, c.o, e); const T = os.reduce((a, o) => a + o.p, 0) || 1; return os.filter((o) => BAD_KINDS.has(o.k)).reduce((a, o) => a + o.p, 0) / T; });
+    const safest = bad.indexOf(Math.min(...bad.filter((b) => b >= 0)));
+    const opts = bad.map((b, k) => k).filter((k) => bad[k] >= 0 && k !== safest);
+    if (!opts.length) return null;
+    slot = r.pick(opts);
+  }
+  s.bt.chaosSeen[x.id] = (s.bt.chaosSeen[x.id] || 0) + 1;
+  s.bt.lastChaos = s.stage;
+  return { x, slot };
+}
+
 function renderEvent(s, adv, e, cast) {
   const r = rngOf(s);
   // trait-specific choice performer
@@ -292,6 +362,7 @@ function renderEvent(s, adv, e, cast) {
   let npcId = null;
   const usesNpc = e.companion || e.choices.some((c) => c.req?.companion || c.o.some((o) => o.loyalty));
   if (usesNpc) { const req = e.req?.companion ? e.req : (e.choices.find((c) => c.req?.companion)?.req || {}); const pool = companionsFor(s, adv, req); if (pool.length) npcId = r.pick(pool); }
+  if (!s.bt) { initBanter(s, r); s.bt.zname = r.pick(ZNAMES); }
   const ctx = { cast, npc: npcId ? npcName(adv, npcId) : undefined };
   const text = fill(s, adv, e.text, ctx);
   const say = [];
@@ -304,49 +375,47 @@ function renderEvent(s, adv, e, cast) {
     if (trait && !hasTrait(c, trait)) continue;
     say.push({ who: id, text: fill(s, adv, t, ctx) });
   }
-  // banter: occasional trait quip, never right after a death
-  if (!s.recentDeaths.length && e.cat !== 'emergency' && e.cat !== 'finale' && e.cat !== 'turn' && adv.quips && r.chance(adv.quipRate ?? 0.33)) {
-    const al = alive(s);
-    if (al.length) {
-      const sp = r.weighted(al, (c) => (1 / (1 + c.involve)) * (['Funny', 'Sarcastic', 'Gamer', 'Reckless'].some((t) => hasTrait(c, t)) ? 3 : (c.traits || []).length > (c.role ? 1 : 0) ? 1.5 : 1));
-      const keys = (sp.traits || []).filter((t) => adv.quips[t]);
-      const pool = keys.length && r.chance(0.75) ? adv.quips[r.pick(keys)] : adv.quips.Any;
-      if (pool && pool.length) {
-        const other = al.filter((c) => c.id !== sp.id);
-        const line = r.pick(pool);
-        if (!/\{other\}/.test(line) || other.length) {
-          say.push({ who: sp.id, text: fill(s, adv, line, { me: sp.id, other: other.length ? r.pick(other).id : null }), quip: true });
-          sp.involve += 0.5;
-        }
-      }
-    }
-  }
-  // reactions to deaths in the previous stage
+  // reactions to deaths in the previous stage: serious, no jokes
   let react = '';
+  const H = { alive, fill, r };
   if (s.recentDeaths.length) {
     const al = alive(s);
     if (al.length) {
       const sp = r.weighted(al, (c) => (hasTrait(c, 'Kind') || hasTrait(c, 'Loyal') ? 3 : 1));
       const dead = s.recentDeaths.map((id) => nameOf(s, id)).join(' and ');
       react = fill(s, adv, adv.deathLines || ['{me} goes quiet. Nobody says {dead}\'s name, but everyone is thinking it.'], { me: sp.id, dead });
+      say.push(...griefBanter(s, adv, H, dead));
     }
     s.recentDeaths = [];
+  } else {
+    // banter between the survivors: conversations, running jokes, callbacks
+    say.push(...sceneBanter(s, adv, H, e, { hasSay: say.length > 0 }));
   }
   const ci = pickChoices(s, adv, e, cast);
+  const chaos = pickChaos(s, adv, e, cast, ci);
   const choices = ci.map((i) => {
     const c = e.choices[i];
     const os = effectiveOutcomes(s, adv, c.o, e);
     const trust = c.o.some((o) => o.loyalty);
     const sp = spread(s);
     const tag = (rk) => rk.map((x) => (x.k === 'hurt' && sp.hurt >= 0.5 ? { ...x, label: x.label + ' (several)' } : x.k === 'danger' && sp.em >= 0.5 ? { ...x, label: x.label + ' (more may come)' } : x));
-    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : tag(riskSummary(os)), special: !!c.badge || !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion)) };
+    return { i, label: fill(s, adv, c.l, ctx), desc: fill(s, adv, c.d, ctx), risk: c.hideRisk ? [] : trust ? [{ k: 'trust', label: '❓ depends who you trust', p: 0 }] : tag(riskSummary(os)), special: !!c.badge || !!(c.req && (c.req.items || c.req.tags || c.req.anyItems || c.req.trait || c.req.flags || c.req.infected || c.req.companion || c.req.mem)) };
   });
+  if (chaos) {
+    const os = effectiveOutcomes(s, adv, chaos.x.o, e);
+    const sp = spread(s);
+    const spreads = chaos.x.o.some((o) => (o.fx || []).some((f) => f[0] === 'hurt' && f[1] === 'r'));
+    const rk = riskSummary(os).map((x) => (x.k === 'hurt' && spreads && sp.hurt >= 0.5 ? { ...x, label: x.label + ' (several)' } : x));
+    const scene = chaos.x.o.some((o) => (o.fx || []).some((f) => f[0] === 'nextcx'));
+    if (scene) rk.push({ k: 'scene', label: '🎬 opens a scene', p: 0 });
+    choices[chaos.slot] = { i: -1, chaos: chaos.x.id, tag: chaos.x.tag || 'chaos', who: cast.v, label: fill(s, adv, chaos.x.l, ctx), desc: fill(s, adv, chaos.x.d, ctx), risk: rk, special: false };
+  }
   const loc = adv.locations[s.loc];
   const sc = e.scene || {};
   s.cur = {
     npc: npcId,
     id: e.id, cat: e.cat, title: fill(s, adv, e.title || loc?.name || '', ctx), cast, text, say, react, choices,
-    scene: { bg: sc.bg || loc?.scene || 'street', z: sc.z ?? (e.cat === 'emergency' ? 2 : 0), light: sc.light || loc?.light || null, props: sc.props || null, cast: Object.values(cast).filter((id) => charById(s, id)?.alive), npcs: [...new Set([...(e.npc || []), ...s.npcs])].filter((id) => adv.npcs?.[id]).slice(0, 3).map((id) => ({ id, ...adv.npcs[id] })) },
+    scene: { bg: sc.bg || loc?.scene || 'street', z: sc.z ?? (e.cat === 'emergency' ? 2 : 0), light: sc.light || loc?.light || null, props: sc.props || null, cast: [...new Set(Object.values(cast))].filter((id) => charById(s, id)?.alive), npcs: [...new Set([...(e.npc || []), ...s.npcs])].filter((id) => adv.npcs?.[id]).slice(0, 3).map((id) => ({ id, ...adv.npcs[id] })) },
     travel: e.cat === 'travel' ? e._travel : null,
   };
 }
@@ -462,6 +531,8 @@ function pickTarget(s, who, ctx) {
     return [c];
   }
   if (who === 'all') return alive(s);
+  if (who && who[0] === '%') { const c = alive(s).find((c) => personaKey(c) === who.slice(1)); return c ? [c] : []; }
+  if (who && who[0] === '@') { const m = s.bt?.mem?.[who.slice(1)]; const c = m && charById(s, m.who); return c && c.alive ? [c] : pickTarget(s, 'r', ctx); }
   if (who === 'injured') { const inj = alive(s).filter((c) => c.hp < MAX_HP).sort((a, b) => a.hp - b.hp); return inj.slice(0, 1); }
   const id = ctx.cast[who];
   const c = id && charById(s, id);
@@ -505,6 +576,8 @@ function consume(s, id, n = 1) {
   e.qty -= n;
   if (e.qty <= 0) s.inv = s.inv.filter((i) => i !== e);
 }
+
+function moveTo(s, lid) { s.loc = lid; s.zone++; s.zoneStages = -1; s.zoneQuota = s.quotas[s.zone]; s.log.locations.push(lid); }
 
 function applyFx(s, adv, fx, ctx) {
   const r = rngOf(s);
@@ -552,6 +625,7 @@ function applyFx(s, adv, fx, ctx) {
         break;
       }
       case 'next': s.pending.unshift({ id: a1, cast: { ...ctx.cast } }); break;
+      case 'nextcx': s.pending.unshift({ id: `${adv.id}_cx_ch_${a1}`, cast: { ...ctx.cast } }); break;
       case 'later': s.pending.push({ id: a1, cast: { ...ctx.cast } }); break;
       case 'flag': s.flags[a1] = a2 === undefined ? true : a2; break;
       case 'unflag': delete s.flags[a1]; break;
@@ -562,7 +636,13 @@ function applyFx(s, adv, fx, ctx) {
       case 'reveal': { const id = ctx.npcId; if (id && s.npcData?.[id]) s.npcData[id].revealed = true; break; }
       case 'npcgone': s.npcs = s.npcs.filter((n) => n !== a1); delete s.flags['npc_' + a1]; break;
       case 'time': s.clock += a1; break;
-      case 'move': s.loc = a1; s.zone++; s.zoneStages = -1; s.zoneQuota = s.quotas[s.zone]; s.log.locations.push(a1); break;
+      case 'move': moveTo(s, a1); break;
+      case 'moveRandom': { const z = adv.zones[s.zone + 1]; if (z && z.length) moveTo(s, r.pick(z)); break; }
+      case 'mem': { // ['mem', key, who, ok]
+        const c = a2 && a2[0] === '@' ? charById(s, s.bt?.mem?.[a2.slice(1)]?.who) : a2 && a2[0] === '%' ? pickTarget(s, a2, ctx)[0] : pickTarget(s, a2 || 'r', ctx)[0];
+        if (c) remember(s, a1, c.id, a3 === undefined ? true : !!a3);
+        break;
+      }
       case 'rest': s.zoneStages = s.zoneQuota - 1; break;
       case 'scavenge': s.zoneStages = s.zoneQuota - 2; break;
       case 'shortcut': s.zoneStages += a1 || 1; break;
@@ -574,9 +654,11 @@ function applyFx(s, adv, fx, ctx) {
   }
 }
 
-function resolveOutcome(s, adv, ev, o, label) {
+function resolveOutcome(s, adv, ev, o, label, meta = {}) {
   const r = rngOf(s);
   const ctx = { cast: { ...s.cur.cast }, deaths: [], hurt: [], healed: [], gained: [], lost: [], extraHurt: [], adv, resolving: true, npcId: s.cur.npc, npc: s.cur.npc ? npcName(adv, s.cur.npc) : undefined };
+  // in a chaos scene, the 'someone else' is never the volunteer themselves
+  if (meta.chaos && ctx.cast.v) { const others = alive(s).filter((c) => c.id !== ctx.cast.v); if (others.length) { const c = r.weighted(others, (c) => 1 / Math.pow(1 + c.danger, 2)); ctx.r = c.id; ctx.cast.r = c.id; } }
   applyFx(s, adv, o.fx, ctx);
   let text = fill(s, adv, o.t, ctx);
   if (ctx.saved) text += ' ' + ctx.saved.join(' ');
@@ -597,13 +679,29 @@ function resolveOutcome(s, adv, ev, o, label) {
   if (ctx.hero) s.log.heroic.push({ stage: s.stage, text });
   const major = ev && (['moral', 'rescue', 'finale', 'timeout', 'turn', 'emergency', 'travel'].includes(ev.cat) || ev.major);
   s.log.decisions.push({ stage: s.stage, event: s.cur.id, title: s.cur.title, choice: label, result: text, major: !!major });
-  s.last = { choice: label, text, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), kind: o.k };
+  // the group remembers what happened, for callbacks later
+  if (s.bt) {
+    if (ctx.hero) { const who = ctx.cast.v || ctx.cast.t || ctx.cast.a; if (who) remember(s, 'hero', who); }
+    const hurt1 = ctx.hurt.find((id) => charById(s, id)?.alive);
+    if (hurt1 && (!s.bt.mem.hurt || s.stage - s.bt.mem.hurt.stage > 8)) remember(s, 'hurt', hurt1);
+    if (ctx.deaths.length) remember(s, 'lost', ctx.deaths[0]);
+    const vol = meta.chaos && ctx.cast.v && charById(s, ctx.cast.v)?.alive ? ctx.cast.v : null;
+    if (vol && !(o.fx || []).some((f) => f[0] === 'nextcx')) {
+      if (['hurt', 'danger', 'death'].includes(o.k)) remember(s, 'blunder', vol, false);
+      else if (o.k === 'good' || o.k === 'item') remember(s, 'clutch', vol, true);
+    }
+  }
+  const H = { alive, fill, r };
+  const rsay = s.bt ? reactionBanter(s, adv, H, { kind: o.k, cat: ev?.cat, chaos: !!meta.chaos, searched: !!meta.searched, hurtId: ctx.hurt.find((id) => charById(s, id)?.alive), itemName: ctx.gained.length ? adv.items[ctx.gained[0]].name : '', deaths: ctx.deaths.length > 0 }) : [];
+  s.last = { choice: label, text, say: rsay, chaos: !!meta.chaos, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), kind: o.k };
   s.clock -= 1;
   s.zoneStages++;
   const wasFinale = ev && ev.cat === 'finale';
   if (wasFinale && !s.pending.some((p) => eventById(adv, p.id)?.cat === 'finale')) s.flags._end = true;
   if (ev && ev.cat === 'timeout') s.flags._end = s.flags._end || !s.flags.continueAfterTimeout;
   nextStage(s, adv);
+  // someone can turn during the move to the next stage: drop their reaction
+  if (s.last?.say) s.last.say = s.last.say.filter((l) => !l.who || charById(s, l.who)?.alive);
   return s;
 }
 
@@ -612,10 +710,10 @@ export function choose(s, adv, displayIndex) {
   const ev = currentEventDef(s, adv);
   const ch = s.cur.choices[displayIndex];
   if (!ch) throw new Error('Invalid choice');
-  const c = ev.choices[ch.i];
+  const c = ch.chaos ? optionById(ch.chaos) : ev.choices[ch.i];
   const os = effectiveOutcomes(s, adv, c.o, ev);
   const o = rngOf(s).weighted(filterLoyalty(s, os, s.cur.npc), (x) => x.p);
-  return resolveOutcome(s, adv, ev, o, ch.label);
+  return resolveOutcome(s, adv, ev, o, ch.label, { chaos: !!ch.chaos || String(s.cur.id).includes('_cx_ch_'), searched: /search|look|raid|check|explore/i.test(ch.label) });
 }
 
 // ---------- items ----------

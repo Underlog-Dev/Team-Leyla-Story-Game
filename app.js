@@ -39,7 +39,24 @@ async function boot() {
 // First run (or first run after this update): put the Team Leyla crew in the library.
 // The old generic starter characters are swapped out, unless they were renamed.
 const OLD_STARTERS = ['mo', 'bex', 'tank', 'skye', 'captainjo', 'zippy', 'dex', 'nanapat'];
+// Update 17: the crew's descriptions and tags now match their personalities.
+// Only characters nobody has edited are refreshed.
+const CREW_V16_DESC = {"leyla": "The host. Calls the shots, keeps the crew alive (mostly).", "bravo": "Part survivor, part cat. Always lands on his feet, always in a suit.", "chris": "Can rig anything that has wires in it.", "hyrisha": "Fastest legs in the crew. Waves never out of place.", "hiwi": "Calm hands, sharp mind. Patches everyone up.", "dardan": "Knows every trail, every plant, every shortcut.", "sonila": "Spots trouble before it spots her.", "isma": "Never leaves anyone behind.", "doa": "Fixes it first, explains it later.", "toddy": "Bucket hat on, no plan, full speed.", "hatice": "Never goes anywhere without her cat, Kheria.", "gaza": "Thousands of hours of practice. Finally, real life.", "loni": "The hair goes up when the fight starts.", "ikram": "Nobody knows where he came from. Nobody asks."};
+async function refreshCrew() {
+  if (S.settings.crewV4) return;
+  const fresh = Object.fromEntries(starterCrew([]).map((c) => [c.name.toLowerCase(), c]));
+  for (let i = 0; i < S.chars.length; i++) {
+    const c = S.chars[i]; const k = c.name.toLowerCase();
+    if (c.id === 'c_starter_' + k && fresh[k] && CREW_V16_DESC[k] === c.description) {
+      S.chars[i] = { ...c, description: fresh[k].description, traits: fresh[k].traits };
+      try { await S.store.saveCharacter(S.chars[i]); } catch {}
+    }
+  }
+  S.settings.crewV4 = true;
+  try { await S.store.setSettings(S.settings); } catch {}
+}
 async function seedTeamLeyla() {
+  await refreshCrew();
   // Update 12: Chris's look was refined. Only touch him if he is still the untouched Update 11 version.
   if (!S.settings.crewV3) {
     const i = S.chars.findIndex((c) => c.id === 'c_starter_chris');
@@ -114,6 +131,7 @@ const SCREENS = {
         <button class="btn big red" data-a="newAdventure">☠ New Adventure</button>
         <button class="btn big" data-a="go" data-to="library">☺ Character Library <small>${S.chars.length}/${MAX_CHARACTERS} survivors</small></button>
         <button class="btn big" data-a="go" data-to="history">📜 Adventure History</button>
+        <button class="btn big" data-a="tutorial">🎓 How to Play <small>A quick guided tour of the game screen</small></button>
       </div>
       ${isInstalled() ? '' : `<div class="menu"><button class="btn install" data-a="installHelp">📲 Add the game to your Home Screen</button></div>`}
       <p class="foot">Free to play · Everything saves on this device · No accounts</p>
@@ -229,16 +247,16 @@ const SCREENS = {
       <div class="scene-wrap">${sceneSVG(cur.scene, castChars, { stage: g.stage })}<div class="scene-title">${h(cur.title)}</div></div>
       <div class="story">
         ${last ? `<div class="outcome panel ${last.deaths.length ? 'bad' : last.kind === 'hurt' || last.kind === 'danger' || last.kind === 'infect' ? 'warn' : 'ok'}">
-          <div class="lbl">WHAT HAPPENED · <span>${last.letter ? `${h(last.letter)}: ` : ''}${h(last.choice)}</span></div><p>${h(last.text)}</p>
+          <div class="lbl">WHAT HAPPENED · <span>${last.letter ? `${h(last.letter)}: ` : ''}${last.chaos ? '🤪 ' : ''}${h(last.choice)}</span></div>${storyHTML(last.text, party)}${(last.say || []).map((l) => sayHTML(l, party)).join('')}
           <div class="chips">${last.gained.map((n) => `<span class="chip g">＋ ${h(n)}</span>`).join('')}${last.lost.map((n) => `<span class="chip r">－ ${h(n)}</span>`).join('')}${last.hurt.filter((n) => !last.deaths.includes(n)).map((n) => `<span class="chip r">🩸 ${h(n)} hurt</span>`).join('')}${last.healed.map((n) => `<span class="chip g">✚ ${h(n)} healed</span>`).join('')}${last.deaths.map((n) => `<span class="chip dead">☠ ${h(n)} died</span>`).join('')}</div></div>` : ''}
         ${cur.react ? `<p class="react">${h(cur.react)}</p>` : ''}
         <p class="narr">${h(cur.text)}</p>
-        ${cur.say.map((l) => { const c = party.find((p) => p.id === l.who); return `<div class="say">${avatarSVG(c.avatar, { size: 34 })}<div><b>${h(c.name)}</b><span>${h(l.text)}</span></div></div>`; }).join('')}
+        ${cur.say.map((l) => sayHTML(l, party)).join('')}
         ${sel ? `<div class="selected panel"><div class="lbl">${streamOn() ? 'CHAT\'S CHOICE' : 'YOUR DECISION'} · OPTION ${L(S.sel)}</div><p class="sl">${h(sel.label)}</p><p>${h(sel.desc)}</p>${riskHTML(sel.risk)}</div>` : `<div class="selected hint">${streamOn() ? 'Read the options out and let chat vote A–E in a poll. Tap the winner, then press NEXT.' : 'Choose an option below, then press NEXT.'}</div>`}
       </div>
       ${infectedBanner(g, a)}
       ${streamOn() ? `<div class="row gap stream-tools"><button class="btn small" data-a="copyOpts">📋 Copy options for chat</button></div>` : ''}
-      <div class="choices">${cur.choices.map((c, i) => `<button class="choice ${S.sel === i ? 'on' : ''}" data-a="pick" data-i="${i}" aria-pressed="${S.sel === i}" aria-label="Option ${L(i)}: ${h(c.label)}"><span class="num">${L(i)}</span><span class="cl">${c.special ? '<em class="unlock">★ Unlocked</em>' : ''}${h(c.label)}${riskHTML(c.risk)}</span></button>`).join('')}</div>
+      <div class="choices">${cur.choices.map((c, i) => `<button class="choice ${S.sel === i ? 'on' : ''}" data-a="pick" data-i="${i}" aria-pressed="${S.sel === i}" aria-label="Option ${L(i)}: ${h(c.label)}"><span class="num">${L(i)}</span><span class="cl">${c.special ? '<em class="unlock">★ Unlocked</em>' : ''}${c.chaos ? (c.tag === 'char' ? `<em class="chaos-tag char">⭐ ${h(party.find((p) => p.id === c.who)?.name || '')} special</em>` : '<em class="chaos-tag">🤪 Chaos option</em>') : ''}${h(c.label)}${riskHTML(c.risk)}</span></button>`).join('')}</div>
       <div class="playfoot">
         <button class="btn pack" data-a="openPack">🎒 Backpack${invCount ? `<span class="badge">${invCount}</span>` : ''}</button>
         <button class="btn next ${sel ? 'ready' : ''}" data-a="next" ${sel ? '' : 'disabled'}>NEXT ➜</button>
@@ -319,6 +337,146 @@ function infectedBanner(g, a) {
   }).join('');
 }
 
+
+// ---------------- tutorial: a guided tour over a demo game ----------------
+// Pages flick through one at a time. Each highlights part of the real game
+// screen with an arrow and a box explaining it. Nothing is saved.
+const TUT = { on: false, i: 0, prev: null, el: null };
+const TUT_STEPS = [
+  { title: 'Welcome!', text: 'This quick tour shows you what everything on the game screen does. It is a pretend game, so nothing gets saved. Tap NEXT to flick through, one thing at a time.' },
+  { sel: '.tb-mid', title: 'Adventure and stage', text: 'The adventure you are playing, the difficulty, and the stage number. Every decision moves the story on by one stage.' },
+  { sel: '.tb-sub', title: 'The clock ⏱', text: 'Every decision uses up time. If the clock hits zero before you reach the end, your escape leaves without you. Some options save time, others cost it.' },
+  { sel: '.heat', title: 'Noise meter 🧟', text: 'Bad outcomes make noise, and noise attracts more zombies, so every risk gets a bit worse. Calm, careful choices let the noise die down again.' },
+  { sel: '.roster', title: 'Your survivors', text: 'Everyone in your group, with their health. Each person has 3 hearts ♥♥♥. An injury takes one away. At zero they die and get a red ✕. Dead is dead: they do not come back.' },
+  { sel: '.roster .mini', title: 'Bitten? 🦠', text: 'If someone gets infected, a 🦠 countdown appears on their picture. Cure them, put them down, or keep them and hope you find a cure before the countdown runs out...' },
+  { sel: '.scene-wrap', title: 'The scene', text: 'A picture of what is happening. Your survivors stand on the left, strangers in the middle, and zombies on the right.' },
+  { sel: '.outcome', title: 'What happened', text: 'After every decision, this box tells you how it went. Green means good, yellow means trouble, red means someone died. The little chips show items found ＋, items lost －, and injuries 🩸.' },
+  { sel: '.narr', title: 'The story', text: 'What is happening right now. On stream, read this bit out loud.' },
+  { sel: '.story .say', title: 'Character chat 💬', text: 'Your survivors talk, joke, argue and remember things that happened earlier, so every game is different. Their personality tags decide how they talk. The name on each bubble shows who is speaking.' },
+  { sel: '.choices', title: 'Options A to E', text: 'Each stage gives you five options. On stream, read them out and let chat vote on a letter.' },
+  { sel: '.choice .risk', title: 'The % chances', text: 'These show the real chance of each thing happening. Green = finding an item. Orange = injury. Red = danger, so an attack may follow. Green-yellow = infection. Black = someone could die. A 20% risk really is 20%.' },
+  { sel: '.choice .chaos-tag', up: '.choice', title: 'Chaos and special options', text: '🤪 Chaos options are ridiculous ideas, like negotiating with a zombie. ⭐ Special options belong to one character, like Chris building a gadget or Hiwi taking a selfie. They really happen if you pick them. Some work brilliantly, some go horribly wrong, and 🎬 some open a whole scene where you choose what happens next.' },
+  { sel: '.choice .unlock', up: '.choice', title: 'Unlocked options ★', text: 'These appear when you carry the right item or have the right person, like a Medic or an Engineer. They are often the best choice on offer.' },
+  { sel: '.selected', before: () => { S.sel = S.game.cur.choices.findIndex((c) => !c.chaos); render(); }, title: 'Check your choice', text: 'Tap an option to pick it. It shows up here with its risks, so you can double-check before you commit.' },
+  { sel: '.btn.next', title: 'NEXT ➜', text: 'Then press NEXT to see what happens. There are no take-backs!' },
+  { sel: '.btn.pack', before: () => { S.pack = null; render(); }, title: 'Backpack 🎒', text: 'Items you find go in the backpack. The number shows how many different items you are carrying.' },
+  { sel: '.pack.panel', before: () => { S.pack = { item: S.game.inv[0]?.id || null, confirm: false, msg: '' }; render(); }, title: 'Using items', text: 'Tap an item to see what it does, then use it. Healing items work any time. Others only work in the right situation. Try one at the right moment and it can unlock a secret outcome!' },
+  { sel: '[data-a="homeConfirm"]', before: () => { S.pack = null; render(); }, title: 'Home 🏠', text: 'Your adventure saves automatically after every decision, so you can leave and carry on later.' },
+  { sel: '[data-a="textSize"]', title: 'Text size', text: 'Aa makes the text bigger. Handy when you are streaming.' },
+  { title: 'Endings', text: 'Each adventure has lots of different endings, good and bad, and your choices decide which one you get. Some strangers can be trusted. Some cannot. Now go and start a real adventure. Good luck!' },
+];
+
+function demoGame() {
+  const party = (S.chars.length >= 4 ? S.chars : starterCrew([])).slice(0, 4);
+  const adv = advById('lto');
+  // find a demo seed where the screen has every part worth showing
+  let best = null;
+  for (let k = 0; k < 120; k++) {
+    const g = newGame(adv, party, 'TUTORIAL' + k, { difficulty: 'easy', useReplay: false });
+    choose(g, adv, g.cur.choices.findIndex((c) => !c.chaos));
+    if (g.finished) continue;
+    const score = (g.cur.choices.some((c) => c.chaos) ? 2 : 0) + (g.cur.choices.some((c) => c.special) ? 2 : 0) + (g.cur.say.some((l) => l.who) ? 1 : 0) + (g.inv.length ? 1 : 0);
+    if (!best || score > best.score) best = { g, score };
+    if (score >= 6) break;
+  }
+  return { g: best.g, adv };
+}
+
+function startTutorial() {
+  const { g, adv } = demoGame();
+  TUT.prev = { game: S.game, adv: S.adv, screen: S.screen, sel: S.sel };
+  TUT.on = true; TUT.i = 0;
+  S.game = g; S.adv = adv; S.sel = null; S.pack = null; S.flash = false;
+  S.screen = 'play'; render();
+  window.scrollTo(0, 0);
+  showTutStep();
+}
+
+function endTutorial() {
+  TUT.on = false;
+  TUT.el?.remove(); TUT.el = null;
+  const p = TUT.prev || {};
+  S.game = p.game || null; S.adv = p.adv || null; S.sel = null; S.pack = null;
+  go('home');
+}
+
+function showTutStep() {
+  const step = TUT_STEPS[TUT.i];
+  if (step.before) step.before();
+  else if (S.pack && step.sel !== '.pack.panel') { S.pack = null; render(); }
+  let target = step.sel ? document.querySelector(step.sel) : null;
+  if (target && step.up) target = target.closest(step.up) || target;
+  // skip pages whose part of the screen is not in this demo
+  if (step.sel && !target) { TUT.i += TUT.dir || 1; if (TUT.i < 0) TUT.i = 0; if (TUT.i >= TUT_STEPS.length) return endTutorial(); return showTutStep(); }
+  if (!TUT.el) {
+    TUT.el = document.createElement('div');
+    TUT.el.className = 'tut';
+    document.body.appendChild(TUT.el);
+    TUT.el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-t]');
+      if (!b) return;
+      e.preventDefault();
+      if (b.dataset.t === 'exit') return endTutorial();
+      if (b.dataset.t === 'next') { if (TUT.i >= TUT_STEPS.length - 1) return endTutorial(); TUT.i++; TUT.dir = 1; }
+      if (b.dataset.t === 'back') { if (TUT.i === 0) return; TUT.i--; TUT.dir = -1; }
+      showTutStep();
+    });
+    window.addEventListener('resize', placeTut);
+  }
+  const last = TUT.i === TUT_STEPS.length - 1;
+  TUT.el.innerHTML = `<div class="tut-hole"></div><div class="tut-arrow"></div>
+    <div class="tut-box panel" role="dialog" aria-live="polite" aria-label="${h(step.title)}">
+      <div class="tut-count">${TUT.i + 1} / ${TUT_STEPS.length}</div>
+      <h3>${h(step.title)}</h3><p>${h(step.text)}</p>
+      <div class="tut-btns">
+        <button class="btn small" data-t="exit">✕ Exit</button>
+        <button class="btn small" data-t="back" ${TUT.i === 0 ? 'disabled' : ''}>◀ Back</button>
+        <button class="btn small green" data-t="next">${last ? 'Finish ✔' : 'Next ▶'}</button>
+      </div></div>`;
+  TUT.target = target;
+  if (target) {
+    const r = target.getBoundingClientRect();
+    const inView = r.top >= 70 && r.bottom <= window.innerHeight - 200;
+    if (!inView) target.scrollIntoView({ block: r.height > window.innerHeight * 0.5 ? 'start' : 'center' });
+  }
+  placeTut();
+  setTimeout(placeTut, 120);
+  TUT.el.querySelector('[data-t="next"]').focus();
+}
+
+function placeTut() {
+  if (!TUT.el) return;
+  const hole = TUT.el.querySelector('.tut-hole'), box = TUT.el.querySelector('.tut-box'), arrow = TUT.el.querySelector('.tut-arrow');
+  const W = window.innerWidth, Hh = window.innerHeight;
+  const t = TUT.target;
+  if (!t) {
+    hole.style.cssText = `left:${W / 2}px;top:${Hh / 2}px;width:0;height:0`;
+    arrow.style.display = 'none';
+    box.style.cssText = `left:12px;right:12px;top:${Math.max(60, Hh / 2 - 120)}px`;
+    return;
+  }
+  const r = t.getBoundingClientRect();
+  const pad = 5;
+  const top = Math.max(2, r.top - pad), bottom = Math.min(Hh - 2, r.bottom + pad);
+  hole.style.cssText = `left:${Math.max(2, r.left - pad)}px;top:${top}px;width:${Math.min(W - 4, r.width + pad * 2)}px;height:${Math.max(10, bottom - top)}px`;
+  const bh = box.offsetHeight || 180;
+  const below = Hh - bottom > bh + 30;
+  const above = top > bh + 30;
+  const cx = Math.max(24, Math.min(W - 24, r.left + r.width / 2));
+  arrow.style.display = 'block';
+  if (below || !above) {
+    const y = below ? bottom + 16 : Math.max(8, Hh - bh - 12);
+    box.style.cssText = `left:12px;right:12px;top:${y}px`;
+    arrow.className = 'tut-arrow up';
+    arrow.style.cssText = `display:block;left:${cx - 12}px;top:${(below ? bottom : y - 16) + 2}px`;
+  } else {
+    const y = top - bh - 16;
+    box.style.cssText = `left:12px;right:12px;top:${y}px`;
+    arrow.className = 'tut-arrow down';
+    arrow.style.cssText = `display:block;left:${cx - 12}px;top:${top - 16}px`;
+  }
+}
+
 // ---------------- streamer helpers ----------------
 async function copyText(text, ok) {
   try { await navigator.clipboard.writeText(text); toast(ok); }
@@ -356,6 +514,23 @@ function deathCard(names) {
     <button class="btn big">Continue ▶</button></div>`, 'dc');
 }
 
+// A line of dialogue with the speaker's face and name, or a stage direction.
+function sayHTML(l, party) {
+  if (!l.who) return `<p class="aside">${h(l.text)}</p>`;
+  const c = party.find((p) => p.id === l.who);
+  if (!c) return '';
+  return `<div class="say">${avatarSVG(c.avatar, { size: 34 })}<div><b>${h(c.name)}</b><span>${h(l.text)}</span></div></div>`;
+}
+// Story text can contain lines like 'Bravo: "..."'. Those become speech bubbles.
+function storyHTML(text, party) {
+  return String(text).split('\n').map((line) => {
+    const m = /^([^:"]{1,24}?)(?: \(([^)]*)\))?: (["(].*)$/.exec(line);
+    const c = m && party.find((p) => p.name === m[1]);
+    if (c) return sayHTML({ who: c.id, text: (m[2] ? `(${m[2]}) ` : '') + m[3] }, party);
+    return `<p>${h(line)}</p>`;
+  }).join('');
+}
+
 function riskHTML(risk) {
   if (!risk || !risk.length) return '';
   return `<span class="risk">${risk.map((r) => `<em class="rk ${r.k}">${h(r.label)}</em>`).join('<i>·</i>')}</span>`;
@@ -391,10 +566,11 @@ const A = {
     modal('Add to Home Screen', `<ol class="install-steps">${steps.map(([ic, t], i) => `<li><span class="step-n">${i + 1}</span><span class="step-ic">${ic}</span><span>${t}</span></li>`).join('')}</ol><p class="note">The game then opens full screen from the zombie icon, like a normal app. Your characters are saved separately there, so use <b>Export</b> in the Character Library to bring them across.</p>`, [{ label: 'Got it', cls: 'green' }]);
   },
   go: (d) => go(d.to),
+  tutorial: () => startTutorial(),
   setMode(d) { S.settings.mode = d.m === 'stream' ? 'stream' : 'solo'; applySettings(); S.store?.setSettings(S.settings).catch(() => {}); render(); toast(streamOn() ? '📺 Streamer mode on.' : '🎮 Solo mode on.'); },
   copyOpts() {
     const g = S.game, cur = g.cur;
-    const text = `🧟 ${S.adv.title} · Stage ${g.stage}\n${cur.title}\nWhat should we do?\n` + cur.choices.map((c, i) => `${L(i)}) ${c.label}`).join('\n');
+    const text = `🧟 ${S.adv.title} · Stage ${g.stage}\n${cur.title}\nWhat should we do?\n` + cur.choices.map((c, i) => `${L(i)}) ${c.chaos ? (c.tag === 'char' ? '⭐ ' : '🤪 ') : ''}${c.label}`).join('\n');
     copyText(text, 'Options copied. Paste them into chat.');
   },
   modalClose: () => closeModal(),
@@ -472,7 +648,8 @@ const A = {
     if (!party.length) return go('select');
     const seed = S.customSeed || S.seed;
     try {
-      S.game = newGame(a, party, seed, { replay: S.replay, useReplay: !S.customSeed, difficulty: diffNow() });
+      const d = new Date(); const today = String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      S.game = newGame(a, party, seed, { replay: S.replay, useReplay: !S.customSeed, difficulty: diffNow(), today });
     } catch (e) { console.error(e); return toast('Could not start the adventure: ' + e.message); }
     S.adv = a; S.sel = null; S.pack = null;
     await save();
@@ -554,6 +731,7 @@ function syncEditor() {
 }
 
 async function save() {
+  if (TUT.on) return;
   try { await S.store.setSave(S.game); S.save = S.game; } catch (e) { console.error(e); toast('Could not save progress on this device.'); }
 }
 
@@ -592,7 +770,7 @@ function onClick(e) {
 }
 app.addEventListener('click', onClick);
 document.addEventListener('keydown', (e) => {
-  if (S.screen !== 'play' || S.pack || S.modal) return;
+  if (S.screen !== 'play' || S.pack || S.modal || TUT.on) return;
   if (e.target.matches('input,textarea')) return;
   if (/^[1-5]$/.test(e.key)) A.pick({ i: Number(e.key) - 1 });
   const li = 'abcde'.indexOf(e.key.toLowerCase());

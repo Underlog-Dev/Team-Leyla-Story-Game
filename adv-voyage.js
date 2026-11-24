@@ -1,4 +1,5 @@
 // ADVENTURE 3: THE LAST VOYAGE — infected cruise ship, escape and reach the mainland.
+import { addComedy } from './chaos.js';
 import { O, C, U, search, safe, rush, travelTables, GENERIC_QUIPS, GENERIC_DEATH_LINES, companionEvents, companionRescue, infectionEvents, roleEvents } from './kit.js';
 
 const A = 'voy';
@@ -65,7 +66,7 @@ const events = [
   }),
   E('open_dinner', {
     cat: 'opening', loc: 'stateroom', essential: true, title: `Formal Night`,
-    text: [`{team} is getting ready for formal night when the screaming starts in the Grand Dining Room below. The ship lurches. Glasses slide off the dressing table. An announcement crackles: "Ladies and gentlemen, please remain in your cabins." Then: "Oh God, no—" Static.`],
+    text: [`{Team} is getting ready for formal night when the screaming starts in the Grand Dining Room below. The ship lurches. Glasses slide off the dressing table. An announcement crackles: "Ladies and gentlemen, please remain in your cabins." Then: "Oh God, no—" Static.`],
     cast: ['a', 'b?'], say: [['a', `"So, remaining in our cabins, then?"`], ['b', `"I am wearing a bow tie. I refuse to die in a bow tie."`, 'Funny'], ['b', `"Something hit the ship. We are listing."`, 'Intelligent']],
     choices: [
       search(`Change into proper clothes and pack`, `Shoes you can run in. A bag of supplies.`, { item: 0.7, hurt: 0, t: { item: `Trainers on, bag packed, and {loot} tucked inside.` } }),
@@ -924,7 +925,8 @@ const T = travelTables({
   danger: [`Halfway there, a cabin door bursts open beside {r}!`, `On the way, something lurches out of a service door at {r}!`, `A lift opens with a ping. Something inside reaches for {r}!`, `A figure in a bathrobe stumbles out of a stairwell, straight at {r}!`, `Something under a pile of deck chairs grabs at {r}!`],
 });
 
-export default {
+export default addComedy({
+  words: { z: 'zombie', zs: 'zombies', goal: 'the lifeboats', place: 'ship', critter: 'seagull' },
   id: A, title: `The Last Voyage`, short: `Ship`,
   tagline: `Luxury cruise. Infected passengers. Sinking fast.`,
   premise: `Passengers aboard the luxury cruise ship Aurora Star begin turning into zombies. The ship loses power and drifts into dangerous waters, taking on water by the hour.`,
@@ -973,4 +975,4 @@ export default {
     { id: 'sunk', title: `Going Down`, cat: 'Failed escape', objective: false, when: (c) => c.timeout || c.flag('sunk'), text: `The Aurora Star sank before they could escape. {survivors} clung to what was left above the waves, waiting for a rescue that came far too slowly.` },
     { id: 'lost', title: `Lost Aboard`, cat: 'Tragic ending', objective: false, when: () => true, text: `The voyage ended aboard the ship. {survivors} remain somewhere on the Aurora Star.` },
   ],
-};
+});
