@@ -4,11 +4,11 @@ import { Rng, hashSeed } from './rng.js';
 import { POOL } from './kit.js';
 import { initBanter, remember, sceneBanter, griefBanter, reactionBanter } from './banter.js';
 import { CHAOS_BY_ID, SITUATION, ZNAMES } from './chaos.js';
-import { characterOptions, OPTION_BY_ID, personaKey, petOf, signLine } from './persona.js';
+import { characterOptions, OPTION_BY_ID, personaKey, petOf, signLine, renameText } from './persona.js';
 const optionById = (id) => CHAOS_BY_ID[id] || OPTION_BY_ID[id];
 
 export const MAX_HP = 3;
-export const MAX_PARTY = 6;
+export const MAX_PARTY = 20;
 
 export const ROLES = {
   Medic: 'Healing items heal 1 extra. Can sometimes save someone from dying of their wounds.',
@@ -189,6 +189,7 @@ function pickVariant(s, list) {
 export function fill(s, adv, text, ctx = {}) {
   if (Array.isArray(text)) text = text.length > 1 ? pickVariant(s, text) : text[0];
   if (!text) return '';
+  text = renameText(s, String(text));
   const al = alive(s);
   const W = adv.words || {};
   return String(text).replace(/\{(@?\w+)\}/g, (m, k) => {
@@ -228,11 +229,14 @@ export function formatClock(adv, units) {
 export const MAX_HEAT = 8;
 export function dangerScale(s, adv) {
   let f = 0.8 + 0.45 * progressOf(s, adv) + 0.09 * Math.min(MAX_HEAT, s.heat || 0);
-  if (alive(s).length === 1) f *= 0.75; // a lone survivor is harder to spot
+  const n = alive(s).length;
+  if (n === 1) f *= 0.75; // a lone survivor is harder to spot
+  if (n > 6) f *= 1 + SIZE_DANGER * (n - 6); // a big crowd is loud and hard to keep safe
   return f;
 }
 // How many extra people a single accident or attack can reach in a big group
-export function spread(s) { const n = alive(s).length; return { hurt: Math.max(0, (n - 2) * 0.32), em: Math.max(0, (n - 3) * 0.15) }; }
+export const SIZE_DANGER = 0.05, SIZE_EM = 0.07;
+export function spread(s) { const n = alive(s).length; return { hurt: Math.max(0, (n - 2) * 0.32), em: Math.max(0, (n - 3) * 0.15) + Math.max(0, n - 6) * SIZE_EM }; }
 
 export function effectiveOutcomes(s, adv, outcomes, ev) {
   const os = outcomes.map((o) => ({ ...o }));

@@ -582,3 +582,24 @@ export function reactionBanter(s, adv, H, info) {
   const key = { after_item: 'item', after_win: 'win', after_nothing: 'fail', after_chaos_win: 'win', after_chaos_fail: 'fail' }[ctx];
   return [voiceLine(s, adv, H, r.weighted(al, (c) => 1 / (1 + (s.bt.count[c.id] || 0))), key, extra)].filter(Boolean);
 }
+
+// ---------------- character editor: how will they talk? ----------------
+export const TRAIT_TALK = {
+  Funny: 'cracks jokes, even at terrible moments', Sarcastic: 'dry, eye-rolling comments', Nervous: 'panics, worries, hears every noise',
+  Brave: 'steps up and protects people', Reckless: 'wants to fight everything, terrible plans', Kind: 'looks after everyone, very caring',
+  Intelligent: 'facts, maths and "technically..."', Practical: 'blunt, sensible, organised', Mysterious: 'cryptic and strange, knows things',
+  Gamer: 'talks like life is a video game', Foodie: 'always thinking about food', 'Nature lover': 'notices animals, plants and weather', Loyal: 'fiercely protective of the group',
+};
+const plain = (t, c) => String(t).replace(/\{z\}/g, 'zombie').replace(/\{zs\}/g, 'zombies').replace(/\{Zs?\}/g, 'Zombie').replace(/\{item\}/g, 'a torch')
+  .replace(/\{h\}/g, 'mate').replace(/\{critter\}/g, 'pigeon').replace(/\{snack\}/g, 'custard creams').replace(/\{place\}/g, 'city').replace(/\{goal\}/g, 'safety')
+  .replace(/\{pet\}/g, c._pet || 'the cat').replace(/\{[@\w]+\}/g, 'someone');
+// A few example lines for a character as they are right now in the editor.
+export function sampleTalk(c, petName) {
+  const ch = { ...c, _pet: petName };
+  const p = personaOf(ch);
+  if (p) return { persona: true, lines: [...p.lines.calm.slice(0, 2), ...p.lines.tense.slice(0, 1)].map((l) => plain(typeof l === 'string' ? l : l.t, ch)) };
+  const v = VL[voiceOf(ch)] || VL.Funny;
+  const out = [v.calm[0], v.tense[0]];
+  for (const pk of packsOf(ch)) out.push(pk.lines.calm[0]);
+  return { persona: false, voice: voiceOf(ch), interests: packsOf(ch).map((pk) => pk.id), lines: out.slice(0, 4).map((l) => plain(l, ch)) };
+}

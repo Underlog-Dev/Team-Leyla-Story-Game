@@ -181,7 +181,7 @@ input:focus, textarea:focus { outline: 3px solid var(--yellow); }
 .comp-row { margin: 4px 0; font-size: .9em; }
 .rk.item { background: #1f4d2f; } .rk.hurt { background: #6b3a12; } .rk.danger { background: #7a1622; } .rk.death { background: #000; color: #ff5d6c; } .rk.infect { background: #2d4a12; color: #c5f27a; }
 .playfoot { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 600px; display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--bg2); border-top: 3px solid var(--edge); z-index: 7; }
-.btn.pack { flex: 1; position: relative; min-height: 52px; max-height: 64px; }
+.btn.pack { flex: 1; width: auto; position: relative; min-height: 52px; max-height: 64px; }
 .btn.next { min-height: 52px; max-height: 64px; }
 .badge { position: absolute; top: -8px; right: -6px; background: var(--red); border: 2px solid var(--edge); font-size: 11px; padding: 1px 6px; }
 .btn.next { flex: 1.4; font-family: var(--title); font-size: 14px; background: #3a3346; }
@@ -357,3 +357,57 @@ body[data-mode="stream"] .choice .num { font-size: 18px; padding: 8px 10px; min-
 .tut-btns .btn { flex: 1; }
 .chaos-tag.char { background: #7b5cff; color: #fff; }
 .rk.scene { background: #3a2a63; color: #e7dcff; }
+
+/* ---------- streamer mode: one full screen per page, no scrolling ---------- */
+.play.stream { height: 100vh; height: 100dvh; display: flex; flex-direction: column; padding-bottom: 0; overflow: hidden; }
+.play.stream .topbar { position: static; flex: none; }
+.play.stream .roster, .play.stream .companions { flex: none; }
+.play.stream .playfoot { position: static; transform: none; flex: none; max-width: none; }
+.play.stream .playfoot .btn.pack { flex: 0 0 auto; width: auto; min-width: 64px; }
+.play.stream .playfoot .btn { flex: 1; width: auto; }
+.play.stream .playfoot .btn.next { flex: 2; font-size: 13px; }
+.sp-body { --fit: 1; flex: 1; min-height: 0; overflow: hidden; font-size: calc(var(--fs) * var(--fit)); padding: 4px 10px; display: flex; flex-direction: column; gap: 4px; }
+.sp-body .scene-wrap { flex: none; width: min(100%, calc(30vh * 96 / 54)); align-self: center; border: 3px solid var(--edge); }
+.play.stream.noscene .sp-body .scene-wrap { display: none; }
+.sp-body .outcome { margin: 2px 0; padding: .45em .6em; }
+.sp-body .outcome p, .sp-body .narr, .sp-body .react { margin: .2em 0; }
+.sp-body .say { margin: 2px 0; }
+.sp-body .say .px-avatar { width: calc(34px * var(--fit)); height: calc(34px * var(--fit)); }
+.sp-body .say div { padding: .25em .5em; }
+.sp-body .lbl { font-size: calc(11px * var(--fit) + 2px); }
+.sp-body .chips { margin-top: 2px; }
+.now-lbl { font-family: var(--title); font-size: calc(10px * var(--fit) + 2px); color: var(--yellow); margin-top: 4px; line-height: 1.5; }
+.vote-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.vote-sub { font-size: .8em; color: var(--dim); }
+.sp-body .choices { padding: 0; margin: 0; gap: 6px; display: flex; flex-direction: column; flex: 1; justify-content: space-evenly; }
+.sp-body .choice { padding: .35em .5em; margin: 0; }
+.sp-body .choice .num { font-size: calc(20px * var(--fit)); min-width: 1.8em; text-align: center; background: var(--yellow); color: #1a1208; padding: .2em .3em; }
+.sp-body .risk { font-size: .62em; }
+.sp-body .inf-banner { margin: 4px 0; }
+.sp-body .stream-tools { display: none; }
+/* roster that always fits: up to 20 people in two rows, hearts always visible */
+.roster.sroster { display: grid; grid-template-columns: repeat(var(--rc), minmax(0, 1fr)); gap: 3px 2px; padding: 4px 6px; overflow: visible; }
+.roster.sroster .alive-count { grid-column: 1 / -1; }
+.roster.sroster .mini { min-width: 0; max-width: none; width: auto; font-size: 10px; }
+.roster.sroster .mini .pic { width: 100%; display: flex; justify-content: center; }
+.roster.sroster .mini .px-avatar { width: min(100%, 42px); height: auto; aspect-ratio: 1; border-width: 2px; }
+.roster.sroster .mini .nm { max-width: 100%; font-size: 10px; }
+.roster.sroster .mini .hp { font-size: 9px; letter-spacing: 0; white-space: nowrap; }
+.roster.sroster .xmark { font-size: 22px; }
+/* the normal (solo) roster with lots of people: 7 per row up to 14, 10 per row beyond */
+.roster.many .mini { width: calc((100% - 22px) / 7); max-width: 52px; }
+.roster.many:has(.mini:nth-child(16)) .mini { width: calc((100% - 22px) / 10); max-width: 46px; }
+/* character editor */
+.trait-help { font-size: .7em; color: var(--dim); margin: -4px 0 8px; padding: 0 12px; }
+.talk-prev .talk-line { margin: 4px 0; padding: 4px 8px; background: #241f35; border-left: 3px solid var(--yellow); font-size: .85em; }
+.roster.sroster .mini .px-avatar { width: min(100%, 40px); }
+.roster.sroster[style*="--rc:7"] .mini .px-avatar, .roster.sroster[style*="--rc:10"] .mini .px-avatar { width: min(100%, 34px); }
+.sp-body .say div { padding: .15em .45em; line-height: 1.2; }
+.sp-body .say b { font-size: .75em; }
+/* crowded page: dialogue becomes compact "Name: line" rows */
+.sp-body.tight .say { display: block; margin: 1px 0; }
+.sp-body.tight .say .px-avatar { display: none; }
+.sp-body.tight .say div { display: block; background: none; border: 0; padding: 0 0 0 .4em; border-left: 3px solid var(--edge); }
+.sp-body.tight .say b { display: inline; font-size: 1em; color: var(--yellow); }
+.sp-body.tight .say b::after { content: ': '; }
+.sp-body.tight .say span { display: inline; }

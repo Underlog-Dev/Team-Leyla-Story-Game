@@ -2,7 +2,7 @@
 import { normaliseAvatar, randomAvatar, TRAITS, ROLE_LIST, AVATAR_OPTIONS } from './avatar.js';
 import { hashSeed } from './rng.js';
 
-export const MAX_CHARACTERS = 20;
+export const MAX_CHARACTERS = 30;
 export const MAX_TRAITS = 3;
 
 export function newId() {

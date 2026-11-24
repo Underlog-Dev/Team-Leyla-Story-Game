@@ -433,8 +433,28 @@ const PACKS = [
 ];
 
 // ---------------- lookups ----------------
-export function personaOf(c) { return c ? PERSONAS[String(c.name || '').trim().toLowerCase()] || null : null; }
-export function personaKey(c) { const k = String(c?.name || '').trim().toLowerCase(); return PERSONAS[k] ? k : null; }
+// The 14 crew keep their personality even if renamed or restyled (matched by their
+// built-in id). Anyone else with the same name as a crew member also gets it.
+export function personaKey(c) {
+  if (!c) return null;
+  const m = /^c_starter_([a-z]+)$/.exec(c.id || '');
+  if (m && PERSONAS[m[1]]) return m[1];
+  const k = String(c.name || '').trim().toLowerCase();
+  return PERSONAS[k] ? k : null;
+}
+export function personaOf(c) { const k = personaKey(c); return k ? PERSONAS[k] : null; }
+
+// Persona text is written with the crew's original names. If someone renamed a
+// crew member, swap in their new name.
+const ORIGINAL = Object.fromEntries(Object.keys(PERSONAS).map((k) => [k, k[0].toUpperCase() + k.slice(1)]));
+export function renameText(s, text) {
+  let out = text;
+  for (const c of s.party || []) {
+    const k = personaKey(c);
+    if (k && c.name !== ORIGINAL[k]) out = out.replace(new RegExp(`\\b${ORIGINAL[k]}\\b`, 'g'), c.name);
+  }
+  return out;
+}
 
 export function packsOf(c) {
   if (personaOf(c)) return [];
@@ -477,7 +497,7 @@ export function signLine(s) {
     if (!p) continue;
     if (p.sign === 'Gemini' && gem.length > 1) continue;
     if (p.sign) bits.push(`${c.name} is ${SIGNS[p.sign].replace(/\{n\}/g, c.name).replace(/\{they\}/g, p.they).replace(/\{their\}/g, p.they === 'she' ? 'her' : 'his').replace(/\{them\}/g, p.they === 'she' ? 'her' : 'him')}.`);
-    else if (c.name.toLowerCase() === 'ikram') bits.push(`Ikram's star sign is... unknown. Of course it is.`);
+    else if (personaKey(c) === 'ikram') bits.push(`${c.name}'s star sign is... unknown. Of course it is.`);
   }
   if (gem.length > 1) bits.unshift(`${gem.map((c) => c.name).join(' AND ')} are both Geminis. Nobody can explain how.`);
   return bits.slice(0, 4).join('\n');

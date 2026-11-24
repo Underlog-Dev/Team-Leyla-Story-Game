@@ -3,6 +3,8 @@ import { createStorage } from './storage.js';
 import { AVATAR_OPTIONS, TRAITS, ROLE_LIST, avatarSVG, defaultAvatar, randomAvatar } from './avatar.js';
 import { makeCharacter, randomCharacter, exportLibrary, parseImport, mergeLibrary, MAX_CHARACTERS, MAX_TRAITS, cleanName, starterCrew } from './characters.js';
 import { ADVENTURES, advById } from './adventures.js';
+import { sampleTalk, TRAIT_TALK } from './banter.js';
+import { personaKey, petOf } from './persona.js';
 import { newGame, choose, useItem, findItemUse, formatClock, historyRecord, updateReplay, statsFrom, hpLabel, MAX_HP, listNames, companionSummary, npcName, ROLES, DIFFICULTY, MAX_PARTY, infectDelay, mercyKill } from './engine.js';
 import { makeSeed, cleanSeed } from './rng.js';
 import { sceneSVG } from './scenes.js';
@@ -109,6 +111,78 @@ function render() {
   app.dataset.screen = S.screen;
   renderModal();
   renderToast();
+  if (S.screen === 'editor') document.getElementById('cdesc')?.addEventListener('input', () => { syncEditor(); const el = document.getElementById('talkprev'); if (el && S.editing) el.innerHTML = talkPreviewHTML(S.editing); });
+  if (S.screen === 'play' && streamLayout()) fitStream();
+}
+const streamLayout = () => streamOn() && !TUT.on;
+
+// Streamer mode: the play screen is two pages (story, then options), each squeezed
+// to fit the whole screen so viewers never miss anything and nobody has to scroll.
+function fitStream() {
+  const body = document.getElementById('spBody');
+  if (!body) return;
+  const play = body.closest('.play');
+  play.classList.remove('noscene');
+  const over = () => body.scrollHeight > body.clientHeight + 2;
+  const shrink = (min) => { let f = 1; body.style.setProperty('--fit', f); while (over() && f > min) { f -= 0.03; body.style.setProperty('--fit', f.toFixed(2)); } };
+  // first try to keep the picture, with text no smaller than 72%
+  body.classList.remove('tight');
+  shrink(0.72);
+  if (over() && body.querySelector('.scene-wrap')) { play.classList.add('noscene'); shrink(0.72); }
+  if (over()) { body.classList.add('tight'); shrink(0.5); } // compact "Name: line" dialogue
+  body.style.overflowY = over() ? 'auto' : 'hidden'; // last resort: allow scrolling
+}
+window.addEventListener('resize', () => { if (S.screen === 'play' && streamLayout()) fitStream(); });
+
+function choiceHTML(c, i, party) {
+  return `<button class="choice ${S.sel === i ? 'on' : ''}" data-a="pick" data-i="${i}" aria-pressed="${S.sel === i}" aria-label="Option ${L(i)}: ${h(c.label)}"><span class="num">${L(i)}</span><span class="cl">${c.special ? '<em class="unlock">★ Unlocked</em>' : ''}${c.chaos ? (c.tag === 'char' ? `<em class="chaos-tag char">⭐ ${h(party.find((p) => p.id === c.who)?.name || '')} special</em>` : '<em class="chaos-tag">🤪 Chaos option</em>') : ''}${h(c.label)}${riskHTML(c.risk)}</span></button>`;
+}
+
+function streamPlay(g, a) {
+  const cur = g.cur, party = g.party, last = g.last;
+  const castChars = cur.scene.cast.map((id) => party.find((p) => p.id === id)).filter(Boolean);
+  const page = S.spage === 'vote' ? 'vote' : 'story';
+  const sel = S.sel != null ? cur.choices[S.sel] : null;
+  const invCount = g.inv.length;
+  const story = `
+      <div class="scene-wrap">${sceneSVG(cur.scene, castChars, { stage: g.stage })}<div class="scene-title">${h(cur.title)}</div></div>
+      ${last ? `<div class="outcome panel ${last.deaths.length ? 'bad' : last.kind === 'hurt' || last.kind === 'danger' || last.kind === 'infect' ? 'warn' : 'ok'}">
+        <div class="lbl">WHAT HAPPENED · <span>${last.letter ? `${h(last.letter)}: ` : ''}${h(last.choice)}</span></div>${storyHTML(last.text, party)}${(last.say || []).map((l) => sayHTML(l, party)).join('')}
+        <div class="chips">${last.gained.map((n) => `<span class="chip g">＋ ${h(n)}</span>`).join('')}${last.lost.map((n) => `<span class="chip r">－ ${h(n)}</span>`).join('')}${last.hurt.filter((n) => !last.deaths.includes(n)).map((n) => `<span class="chip r">🩸 ${h(n)} hurt</span>`).join('')}${last.healed.map((n) => `<span class="chip g">✚ ${h(n)} healed</span>`).join('')}${last.deaths.map((n) => `<span class="chip dead">☠ ${h(n)} died</span>`).join('')}</div></div>` : ''}
+      ${cur.react ? `<p class="react">${h(cur.react)}</p>` : ''}
+      <div class="now-lbl">NOW: ${h(cur.title)}</div>
+      <p class="narr">${h(cur.text)}</p>
+      ${cur.say.map((l) => sayHTML(l, party)).join('')}
+      ${infectedBanner(g, a)}`;
+  const vote = `
+      <div class="vote-head"><div><div class="now-lbl">WHAT DO WE DO? · ${h(cur.title)}</div><div class="vote-sub">Chat, vote A–E!</div></div><button class="btn small" data-a="copyOpts" aria-label="Copy options for chat">📋</button></div>
+      <div class="choices">${cur.choices.map((c, i) => choiceHTML(c, i, party)).join('')}</div>
+      ${infectedBanner(g, a)}`;
+  return `<div class="play stream ${page} ${S.flash ? 'flash' : ''}" style="--accent:${a.colour}">
+      <header class="topbar">
+        <button class="icon-btn" data-a="homeConfirm" aria-label="Home">🏠</button>
+        <div class="tb-mid"><div class="tb-title">${h(a.title)}</div><div class="tb-sub">📺 ${h(DIFFICULTY[g.diff || 'medium'].label)} · Stage ${g.stage} · ⏱ ${formatClock(a, g.clock)}</div><div class="heat">🧟 Noise <span>${Array.from({ length: 4 }, (_, i) => `<i class="${(g.heat || 0) > i * 2 ? 'on' : ''}"></i>`).join('')}</span></div></div>
+        <button class="icon-btn" data-a="textSize" aria-label="Text size">Aa</button>
+      </header>
+      ${rosterHTML(g, true)}
+      ${g.npcs.length ? `<div class="companions">With you: ${g.npcs.map((id) => `<b>${h(npcName(a, id))}</b>`).join(', ')}</div>` : ''}
+      <div class="sp-body" id="spBody">${page === 'story' ? story : vote}</div>
+      <div class="playfoot">
+        ${page === 'story'
+    ? `<button class="btn pack" data-a="openPack">🎒${invCount ? `<span class="badge">${invCount}</span>` : ''}</button><button class="btn next ready" data-a="spage" data-p="vote">📊 OPTIONS ➜</button>`
+    : `<button class="btn" data-a="spage" data-p="story">◀ STORY</button><button class="btn pack" data-a="openPack">🎒${invCount ? `<span class="badge">${invCount}</span>` : ''}</button><button class="btn next ${sel ? 'ready' : ''}" data-a="next" ${sel ? '' : 'disabled'}>${sel ? `GO WITH ${L(S.sel)} ➜` : 'PICK ONE'}</button>`}
+      </div>
+      ${S.pack ? packHTML() : ''}
+    </div>`;
+}
+
+function rosterHTML(g, stream) {
+  const party = g.party, n = party.length;
+  const cols = stream ? (n <= 7 ? Math.max(n, 4) : n <= 14 ? Math.ceil(n / 2) : 10) : 0;
+  const big = !stream && n > 7;
+  return `<div class="roster ${big ? 'many' : ''} ${stream ? 'sroster' : ''}" ${stream ? `style="--rc:${cols}"` : ''}>${n > 7 ? `<div class="alive-count">${party.filter((c) => c.alive).length}/${n} alive</div>` : ''}${party.map((c) => `<div class="mini ${c.alive ? '' : 'dead'} ${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? 'infected' : ''}" title="${h(c.name)}: ${c.alive ? hpLabel(c.hp) : 'Dead'}">
+        <div class="pic">${avatarSVG(c.avatar, { size: 38 })}${c.alive ? '' : '<div class="xmark">✕</div>'}${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? `<div class="inf-badge" title="Turns in ${Math.max(0, c.infected.at + infectDelay(g) - g.stage)} turns">🦠${Math.max(0, c.infected.at + infectDelay(g) - g.stage)}${c.infected.resolved === 'restrained' ? '⛓' : ''}</div>` : ''}</div>
+        <span class="nm">${h(c.name)}</span><span class="hp">${c.alive ? '♥'.repeat(c.hp) + '<i>' + '♥'.repeat(MAX_HP - c.hp) + '</i>' : '0/3'}</span></div>`).join('')}</div>`;
 }
 
 const ROLE_ICON = { Medic: '✚', Engineer: '🔧', Fighter: '⚔', Scout: '👁', Leader: '★', Athlete: '⚡' };
@@ -177,7 +251,9 @@ const SCREENS = {
           <div class="role-pick">${ROLE_LIST.map((r) => `<button class="role-opt ${c.role === r ? 'on' : ''}" data-a="role" data-r="${r}" aria-pressed="${c.role === r}"><b>${ROLE_ICON[r]} ${r}</b><span>${h(ROLES[r])}</span></button>`).join('')}</div></div>
         <div class="field"><span>Personality <small>(up to ${MAX_TRAITS}, optional, changes how they talk and act)</small></span>
           <div class="trait-pick">${TRAITS.map((t) => `<button class="chip pick ${c.traits.includes(t) ? 'on' : ''}" data-a="trait" data-t="${t}" aria-pressed="${c.traits.includes(t)}">${t}</button>`).join('')}</div></div>
-        <label class="field"><span>Short description <small>(optional)</small></span><textarea id="cdesc" maxlength="160" rows="2" placeholder="e.g. Ex-postie who never stops talking">${h(c.description)}</textarea></label>
+        ${c.traits.length ? `<div class="trait-help">${c.traits.map((t) => `<div><b>${h(t)}:</b> ${h(TRAIT_TALK[t] || '')}</div>`).join('')}</div>` : ''}
+        <label class="field"><span>Short description <small>(optional: mention pets, hobbies or jobs and they will come up in the story)</small></span><textarea id="cdesc" maxlength="160" rows="2" placeholder="e.g. Has a dog called Rex, loves football and baking">${h(c.description)}</textarea></label>
+        <div id="talkprev">${talkPreviewHTML(c)}</div>
         <div class="row gap"><button class="btn big green" data-a="saveChar">💾 Save Character</button></div>
       </div>
     </div>`;
@@ -187,7 +263,7 @@ const SCREENS = {
     const n = S.selected.size;
     return `<div class="screen">
       <header class="bar">${back()}<h1>Choose Survivors</h1><span class="count">${n}/${MAX_PARTY}</span></header>
-      ${S.chars.length ? `<p class="note pad">Pick up to ${MAX_PARTY} survivors. Your choices steer the whole team, and anyone can get hurt.</p><div class="row gap wrap"><button class="btn small" data-a="selAll">🎲 Pick ${Math.min(MAX_PARTY, S.chars.length)} at random</button><button class="btn small" data-a="selNone">Clear</button><button class="btn small" data-a="go" data-to="library">Manage library</button></div>
+      ${S.chars.length ? `<p class="note pad">Pick up to ${MAX_PARTY} survivors. Your choices steer the whole team, and anyone can get hurt.</p><div class="row gap wrap"><button class="btn small" data-a="selAll">🎲 Random ${Math.min(6, S.chars.length)}</button><button class="btn small" data-a="selEveryone">✔ Everyone${S.chars.length > MAX_PARTY ? ` (first ${MAX_PARTY})` : ''}</button><button class="btn small" data-a="selNone">Clear</button><button class="btn small" data-a="go" data-to="library">Manage library</button></div>
       <div class="char-grid pickable">${S.chars.map((c) => `<button class="char-card panel ${S.selected.has(c.id) ? 'on' : ''}" data-a="toggleSel" data-id="${c.id}" aria-pressed="${S.selected.has(c.id)}">
         ${avatarSVG(c.avatar, { size: 64 })}<div class="char-name">${h(c.name)}</div>${roleChip(c.role)}<div class="tick">${S.selected.has(c.id) ? '✔' : ''}</div></button>`).join('')}</div>
       <div class="sticky-foot"><button class="btn big red" data-a="toAdventures" ${n ? '' : 'disabled'}>Next ▶ <small>${n ? `${n} survivor${n > 1 ? 's' : ''}` : 'pick at least 1'}</small></button></div>`
@@ -228,6 +304,7 @@ const SCREENS = {
   play() {
     const g = S.game, a = S.adv;
     if (!g || !a) return SCREENS.home();
+    if (streamLayout()) return streamPlay(g, a);
     const cur = g.cur;
     const party = g.party;
     const castChars = cur.scene.cast.map((id) => party.find((p) => p.id === id)).filter(Boolean);
@@ -240,9 +317,7 @@ const SCREENS = {
         <div class="tb-mid"><div class="tb-title">${h(a.title)}</div><div class="tb-sub">${streamOn() ? '📺 ' : ''}${h(DIFFICULTY[g.diff || 'medium'].label)} · Stage ${g.stage} · ⏱ ${formatClock(a, g.clock)}</div><div class="heat" title="Noise: risky outcomes draw more infected and raise every danger">🧟 Noise <span>${Array.from({ length: 4 }, (_, i) => `<i class="${(g.heat || 0) > i * 2 ? 'on' : ''}"></i>`).join('')}</span></div></div>
         <button class="icon-btn" data-a="textSize" aria-label="Text size">Aa</button>
       </header>
-      <div class="roster ${party.length > 7 ? 'many' : ''}">${party.length > 7 ? `<div class="alive-count">${party.filter((c) => c.alive).length}/${party.length} alive</div>` : ''}${party.map((c) => `<div class="mini ${c.alive ? '' : 'dead'} ${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? 'infected' : ''}" title="${h(c.name)}: ${c.alive ? hpLabel(c.hp) : 'Dead'}">
-        <div class="pic">${avatarSVG(c.avatar, { size: 38 })}${c.alive ? '' : '<div class="xmark">✕</div>'}${c.alive && c.infected && !['cured', 'dead'].includes(c.infected.resolved) ? `<div class="inf-badge" title="Turns in ${Math.max(0, c.infected.at + infectDelay(g) - g.stage)} turns">🦠${Math.max(0, c.infected.at + infectDelay(g) - g.stage)}${c.infected.resolved === 'restrained' ? '⛓' : ''}</div>` : ''}</div>
-        <span class="nm">${h(c.name)}</span><span class="hp">${c.alive ? '♥'.repeat(c.hp) + '<i>' + '♥'.repeat(MAX_HP - c.hp) + '</i>' : '0/3'}</span></div>`).join('')}</div>
+      ${rosterHTML(g, false)}
       ${g.npcs.length ? `<div class="companions">With you: ${g.npcs.map((id) => `<b>${h(npcName(a, id))}</b>`).join(', ')}</div>` : ''}
       <div class="scene-wrap">${sceneSVG(cur.scene, castChars, { stage: g.stage })}<div class="scene-title">${h(cur.title)}</div></div>
       <div class="story">
@@ -566,6 +641,7 @@ const A = {
     modal('Add to Home Screen', `<ol class="install-steps">${steps.map(([ic, t], i) => `<li><span class="step-n">${i + 1}</span><span class="step-ic">${ic}</span><span>${t}</span></li>`).join('')}</ol><p class="note">The game then opens full screen from the zombie icon, like a normal app. Your characters are saved separately there, so use <b>Export</b> in the Character Library to bring them across.</p>`, [{ label: 'Got it', cls: 'green' }]);
   },
   go: (d) => go(d.to),
+  spage(d) { S.spage = d.p === 'vote' ? 'vote' : 'story'; render(); window.scrollTo(0, 0); },
   tutorial: () => startTutorial(),
   setMode(d) { S.settings.mode = d.m === 'stream' ? 'stream' : 'solo'; applySettings(); S.store?.setSettings(S.settings).catch(() => {}); render(); toast(streamOn() ? '📺 Streamer mode on.' : '🎮 Solo mode on.'); },
   copyOpts() {
@@ -598,7 +674,15 @@ const A = {
   diff(d) { S.settings.difficulty = d.k; S.store?.setSettings(S.settings).catch(() => {}); render(); },
   async randomChar() { if (S.chars.length >= MAX_CHARACTERS) return; const c = randomCharacter(S.chars.map((x) => x.name)); await S.store.saveCharacter(c); S.chars.push(c); render(); toast(`${c.name} joined the library.`); },
   async quickFour() { for (let i = 0; i < 4 && S.chars.length < MAX_CHARACTERS; i++) { const c = randomCharacter(S.chars.map((x) => x.name)); await S.store.saveCharacter(c); S.chars.push(c); if (S.selected.size < MAX_PARTY) S.selected.add(c.id); } render(); },
-  editChar(d) { const c = S.chars.find((x) => x.id === d.id); S.editing = { ...structuredClone(c), isNew: false }; go('editor'); },
+  editChar(d) {
+    const c = S.chars.find((x) => x.id === d.id);
+    const open = () => { S.editing = { ...structuredClone(c), isNew: false }; go('editor'); };
+    if (!/^c_starter_/.test(c.id)) return open();
+    modal('⚠️ Editing a Team Leyla character', `<p><b>${h(c.name)}</b> is one of the 14 default characters.</p>
+      <p>You can change their look, name, role and tags. This will change their default settings: their role decides what they are good at in the story, and their tags and description are what you see in the library.</p>
+      <p><b>The way they talk and behave stays the same.</b> Their personality, jokes and special options are built in, even if you rename them.</p>`,
+      [{ label: 'Cancel' }, { label: 'Edit anyway', cls: 'green', fn: open }]);
+  },
   delChar(d) {
     const c = S.chars.find((x) => x.id === d.id);
     modal('Delete character?', `<div class="center">${avatarSVG(c.avatar, { size: 72 })}<p>Delete <b>${h(c.name)}</b> from your library forever? Their past adventures stay in your history.</p></div>`, [
@@ -635,7 +719,8 @@ const A = {
       document.getElementById('importText')?.addEventListener('input', (ev) => { pendingImport.text = ev.target.value; });
     }, 0);
   },
-  selAll() { S.selected = new Set([...S.chars].sort(() => Math.random() - 0.5).slice(0, MAX_PARTY).map((c) => c.id)); render(); },
+  selAll() { S.selected = new Set([...S.chars].sort(() => Math.random() - 0.5).slice(0, Math.min(6, MAX_PARTY)).map((c) => c.id)); render(); },
+  selEveryone() { S.selected = new Set(S.chars.slice(0, MAX_PARTY).map((c) => c.id)); render(); },
   selNone() { S.selected.clear(); render(); },
   toggleSel(d) { if (S.selected.has(d.id)) S.selected.delete(d.id); else if (S.selected.size >= MAX_PARTY) return toast(`A team can have up to ${MAX_PARTY} survivors.`); else S.selected.add(d.id); render(); },
   toAdventures() { if (!S.selected.size) return; go('adventures'); },
@@ -724,6 +809,14 @@ async function doImport() {
     { label: 'Add to library', cls: 'green', fn: () => apply('merge') }, { label: 'Replace library', cls: 'red', fn: () => apply('replace') }, { label: 'Cancel' }]);
 }
 
+const INTEREST = { pet: '🐾 pet', bake: '🧁 cooking & baking', game: '🎮 gaming', selfie: '📸 selfies & fame', farm: '🐄 animals & outdoors', beauty: '💅 nails, hair & fashion', sport: '⚽ sport & speed', fix: '🔧 fixing & building', mystery: '🕵️ mystery', army: '🪖 army stuff', music: '🎵 music' };
+function talkPreviewHTML(c) {
+  const t = sampleTalk({ id: c.id || '', name: c.name || '', traits: c.traits || [], role: c.role, description: c.description || '' }, petOf(c).pet);
+  const head = t.persona ? `Their built-in Team Leyla personality decides how they talk:`
+    : `Talks in a <b>${h(t.voice)}</b> way${t.interests.length ? `, and will bring up: ${t.interests.map((k) => INTEREST[k] || k).join(', ')}` : ''}. They also get their own special options in the story.`;
+  return `<div class="panel talk-prev"><div class="lbl">💬 HOW THEY WILL TALK</div><p class="note">${head}</p>${t.lines.map((l) => `<p class="talk-line">${h(l)}</p>`).join('')}</div>`;
+}
+
 function syncEditor() {
   const n = document.getElementById('cname'); const d = document.getElementById('cdesc');
   if (n && S.editing) S.editing.name = n.value;
@@ -737,6 +830,7 @@ async function save() {
 
 async function afterAdvance(aliveBefore) {
   const g = S.game;
+  S.spage = 'story';
   S.flash = g.party.filter((c) => c.alive).length < aliveBefore;
   if (S.flash && streamOn()) {
     const names = g.party.filter((c) => !c.alive && !(afterAdvance.seen || new Set()).has(c.id)).map((c) => c.name);
