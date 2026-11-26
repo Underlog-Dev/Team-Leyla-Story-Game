@@ -19,6 +19,25 @@
 <body>
 <main id="app" aria-live="polite"><div class="loading">Loading…</div></main>
 <noscript><p style="padding:2rem;color:#fff">This game needs JavaScript turned on.</p></noscript>
+<script>
+// If the game has not started after a few seconds, check which files are missing
+// on the website and say so, instead of sitting on "Loading..." forever.
+setTimeout(async function () {
+  var app = document.getElementById('app');
+  if (!app || !app.querySelector('.loading')) return;
+  var need = ['adv-forest.js', 'adv-train.js', 'adv-voyage.js', 'adventures.js', 'app.js', 'avatar.js', 'banter.js', 'chaos-more.js', 'chaos.js', 'characters.js', 'crewbanter.js', 'engine.js', 'icons.js', 'kit.js', 'mishaps.js', 'persona.js', 'recap.js', 'rng.js', 'scenes.js', 'storage.js'];
+  var missing = [];
+  for (var i = 0; i < need.length; i++) {
+    try { var r = await fetch(need[i] + '?check=' + Date.now(), { cache: 'no-store' }); if (!r.ok) missing.push(need[i]); } catch (e) { missing.push(need[i]); }
+  }
+  app.innerHTML = '<div style="padding:24px;color:#fff;font-family:sans-serif;line-height:1.5;max-width:520px;margin:auto">' +
+    '<h2 style="margin-top:0">The game could not start</h2>' +
+    (missing.length
+      ? '<p>These files are missing from the website:</p><ul><li>' + missing.join('</li><li>') + '</li></ul><p>Upload them to GitHub (top level, no folders), wait a couple of minutes, then tap Try again.</p>'
+      : '<p>All the files are there, but some may still be the old version. GitHub can take a few minutes to update. Wait a couple of minutes, then tap Try again.</p>') +
+    '<button style="font-size:18px;padding:10px 18px" onclick="location.replace(location.pathname + \'?v=\' + Date.now())">Try again</button></div>';
+}, 8000);
+</script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -9,6 +9,7 @@
 //   {item} the item just found                   {zname} the zombie someone named
 //   {n}  a running count                         {@key} whoever a memory is about
 
+import { HURT_REACT, DEATH_REACT, envOf } from './mishaps.js';
 import { PERSONAS, personaOf, personaKey, packsOf, birthdayToday } from './persona.js';
 
 // ---------------- voices ----------------
@@ -357,6 +358,8 @@ export function initBanter(s, r) {
 export function remember(s, key, who, ok) {
   if (!s.bt || !who) return;
   s.bt.mem[key] = { who, stage: s.stage, ok: ok === undefined ? true : !!ok, calls: 0 };
+  const T = ((s.bt.tally ||= {})[key] ||= {});
+  T[who] = (T[who] || 0) + 1;
 }
 
 // ---------------- selection ----------------
@@ -397,7 +400,7 @@ export function pickTemplate(s, adv, H, ctxName, fixed = {}, extra = {}) {
   const cast = castLines(s, H, slotsOf(t), t.pref, fixed);
   if (!cast) return null;
   s.bt.used.push(t.id);
-  if (s.bt.used.length > 60) s.bt.used.splice(0, 20);
+  if (s.bt.used.length > 160) s.bt.used.splice(0, 40);
   return render(s, adv, H, t.lines, cast, extra);
 }
 
@@ -455,7 +458,7 @@ function quirkLines(s, adv, H) {
 }
 
 // Conversations written for specific people (Leyla vs Bravo, Gaza vs Chris...).
-function personaConvo(s, adv, H, ctxName) {
+function personaConvo(s, adv, H, ctxName, ecat) {
   const al = H.alive(s);
   const byKey = {};
   for (const c of al) { const k = personaKey(c); if (k) byKey[k] = c; }
@@ -465,6 +468,8 @@ function personaConvo(s, adv, H, ctxName) {
     if (s.stage - (s.bt.pcool[k] ?? -9) < 3) continue;
     for (const cv of PERSONAS[k].convos) {
       if (cv.ctx !== ctxName || s.bt.used.includes(cv.id)) continue;
+      if (cv.cats && !cv.cats.includes(ecat)) continue;
+      if (cv.env && !cv.env.includes(envOf(adv))) continue;
       if (cv.id.startsWith('ism_bday') && s.today === PERSONAS.chris.birthday) continue;
       const named = [...new Set([...cv.lines.map((l) => l[0]).filter((x) => PERSONAS[x]), ...(cv.need || [])])];
       if (!named.every((x) => byKey[x] && x !== k)) continue;
@@ -532,7 +537,7 @@ export function sceneBanter(s, adv, H, e, { hasSay = false } = {}) {
   if (!al.length || ['turn', 'timeout'].includes(e.cat)) return [];
   if (e.cat === 'finale') return [];
   if (e.cat === 'emergency') {
-    if (al.length >= 2 && r.chance(0.4)) return (r.chance(0.5) && personaConvo(s, adv, H, 'tense')) || pickTemplate(s, adv, H, 'tense') || [];
+    if (al.length >= 2 && r.chance(0.4)) return (r.chance(0.5) && personaConvo(s, adv, H, 'tense', e.cat)) || pickTemplate(s, adv, H, 'tense') || [];
     return [];
   }
   // serious moments get far less chatter
@@ -546,7 +551,7 @@ export function sceneBanter(s, adv, H, e, { hasSay = false } = {}) {
   const tenseScene = (e.cat === 'zombie' || e.cat === 'hazard') && r.chance(0.5);
   const peopleScene = (e.cat === 'interaction' || e.cat === 'rescue') && (e.npc || e.companion || /stranger|man|woman|someone|voice/i.test(String(e.text)));
   if (roll < 0.3) out = callbackLines(s, adv, H);
-  if (!out && roll < 0.7) out = personaConvo(s, adv, H, peopleScene && r.chance(0.6) ? 'people' : tenseScene ? 'tense' : 'calm');
+  if (!out && roll < 0.7) out = personaConvo(s, adv, H, peopleScene && r.chance(0.6) ? 'people' : tenseScene ? 'tense' : 'calm', e.cat);
   if (!out && roll < 0.8) out = quirkLines(s, adv, H);
   if (!out && al.length >= 2 && r.chance(0.8)) out = pickTemplate(s, adv, H, e.cat === 'travel' ? (r.chance(0.6) ? 'travel' : 'calm') : (e.cat === 'zombie' || e.cat === 'hazard') && r.chance(0.5) ? 'tense' : 'calm');
   if (!out) { const c = r.weighted(al, (c) => 1 / (1 + (s.bt.count[c.id] || 0))); out = [voiceLine(s, adv, H, c, e.cat === 'zombie' ? 'tense' : 'calm')].filter(Boolean); }
@@ -590,6 +595,44 @@ export function reactionBanter(s, adv, H, info) {
   }
   const key = { after_item: 'item', after_win: 'win', after_nothing: 'fail', after_chaos_win: 'win', after_chaos_fail: 'fail' }[ctx];
   return [voiceLine(s, adv, H, r.weighted(al, (c) => 1 / (1 + (s.bt.count[c.id] || 0))), key, extra)].filter(Boolean);
+}
+
+// After a ridiculous accident: shock, then the friends they are.
+export function mishapBanter(s, adv, H, m) {
+  const r = H.r;
+  const al = H.alive(s);
+  const others = al.filter((c) => c.id !== m.who);
+  if (!others.length) return m.death ? [] : [{ who: null, text: 'Nobody saw that. Thank goodness nobody saw that.', aside: true }];
+  const victimAlive = al.some((c) => c.id === m.who);
+  const extra = { ...m.tok, h: m.tok.v };
+  const fits = (lines) => {
+    const sp = [...new Set(lines.map((l) => l[0]).filter((k) => k !== '-'))];
+    if (sp.includes('v') && !victimAlive) return false;
+    return sp.filter((k) => k !== 'v').length <= others.length;
+  };
+  let lines = null;
+  if (!m.death && m.r && fits(m.r) && r.chance(0.7)) lines = m.r;
+  if (!lines) {
+    const base = m.death ? DEATH_REACT : HURT_REACT;
+    const tag = m.death ? 'md' : 'mh';
+    const pool = base.map((l, i) => ({ l, id: tag + i })).filter((x) => fits(x.l) && !s.bt.used.includes(x.id));
+    const pick = r.pick(pool.length ? pool : base.map((l, i) => ({ l, id: tag + i })).filter((x) => fits(x.l)));
+    if (pick) { lines = pick.l; s.bt.used.push(pick.id); }
+  }
+  let out = [];
+  if (lines) {
+    const slots = [...new Set(lines.map((l) => l[0]).filter((k) => k !== '-' && k !== 'v'))];
+    const cast = castLines(s, H, slots, null, victimAlive ? { v: m.who } : {});
+    if (cast) out = render(s, adv, H, lines, cast, extra);
+  }
+  // a personal reaction from someone with their own way of talking
+  const pers = others.filter((c) => personaOf(c)?.lines?.[m.death ? 'mishapdeath' : 'mishap']);
+  if (pers.length && r.chance(0.6)) {
+    const c = r.pick(pers);
+    const l = voiceLine(s, adv, H, c, m.death ? 'mishapdeath' : 'mishap', extra);
+    if (l && personaOf(c)) out.push(l);
+  }
+  return out;
 }
 
 // ---------------- character editor: how will they talk? ----------------

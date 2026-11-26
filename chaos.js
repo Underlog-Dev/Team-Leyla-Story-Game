@@ -3,6 +3,7 @@
 // play out properly, and can come back later as payoffs and callbacks.
 // Outcome kinds keep the risk labels honest, exactly like normal options.
 import { O, C, safe, rush, search } from './kit.js';
+import { MORE_CHAOS, moreEvents } from './chaos-more.js';
 
 // {v} is the volunteer chosen when the option appears (so chat can see who it is).
 // fx 'mem' records who did what, for callbacks and payoff events later.
@@ -257,6 +258,7 @@ export const CHAOS = [
     O(0.5, 'danger', lines(`{v} starts a song. It is very catchy. It is also very loud, and something follows the music all the way to {r}.`), [['moveRandom'], ['em', 'r'], ['mem', 'sing', 'v', 0]]),
   ], { vpref: ['Funny', 'Kind', 'Loyal'], req: { nomem: 'sing' } }),
 ];
+CHAOS.push(...MORE_CHAOS);
 export const CHAOS_BY_ID = Object.fromEntries(CHAOS.map((c) => [c.id, c]));
 
 // Which kind of chaos fits which kind of stage.
@@ -434,7 +436,7 @@ const DUCK_USE = { consume: 0, o: [O(0.65, 'good', `SQUEAK!\nThe {z} snaps round
 export function addComedy(adv) {
   adv.words = { z: 'zombie', zs: 'zombies', goal: 'safety', place: 'place', critter: 'pigeon', ...(adv.words || {}) };
   adv.items.duck = { name: `Rubber Duck`, icon: 'duck', desc: `Small, yellow and squeaky. Completely useless. Probably. (Squeeze it during an attack.)`, tags: ['squeaky'], qty: 1, max: 1, unique: true };
-  adv.events.push(...comedyEvents(adv.id), ...chainEvents(adv.id));
+  adv.events.push(...comedyEvents(adv.id), ...chainEvents(adv.id), ...moreEvents(adv));
   for (const e of adv.events) if (e.cat === 'emergency') e.uses = { ...(e.uses || {}), duck: DUCK_USE };
   adv.chaos = CHAOS;
   return adv;

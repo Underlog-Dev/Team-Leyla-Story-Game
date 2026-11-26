@@ -2,8 +2,10 @@
 // seeded Rng whose state lives in the game state, so saves resume exactly.
 import { Rng, hashSeed } from './rng.js';
 import { POOL } from './kit.js';
-import { initBanter, remember, sceneBanter, griefBanter, reactionBanter } from './banter.js';
+import { initBanter, remember, sceneBanter, griefBanter, reactionBanter, mishapBanter } from './banter.js';
 import { CHAOS_BY_ID, SITUATION, ZNAMES } from './chaos.js';
+import { pickMishap, mishapText, envOf } from './mishaps.js';
+import { buildRecap } from './recap.js';
 import { characterOptions, OPTION_BY_ID, personaKey, petOf, signLine, renameText } from './persona.js';
 const optionById = (id) => CHAOS_BY_ID[id] || OPTION_BY_ID[id];
 
@@ -77,6 +79,7 @@ export function newGame(adv, characters, seed, { replay = null, useReplay = true
   s.quotas = adv.zones.map((z, i) => { const q = adv.zoneQuota?.[i] || [3, 5]; return r.range(q[0], q[1]); });
   s.zoneQuota = s.quotas[0];
   initBanter(s, r); s.bt.zname = r.pick(ZNAMES);
+  if (replay?.mishaps) s.bt.avoidMishaps = replay.mishaps.slice(0, 30);
   for (const [id, q] of (adv.startKit?.[s.diff] || [])) { const d = adv.items[id]; if (d) s.inv.push({ id, qty: q || d.qty || 1 }); }
   const opening = r.weighted(adv.events.filter((e) => e.cat === 'opening' && reqOK(s, adv, e.req) && castable(s, e)), (e) => (e.w || 1) * (s.rw[e.id] ?? 1));
   s.pending.push({ id: opening.id });
@@ -325,7 +328,7 @@ function pickChaos(s, adv, e, cast, ci) {
   if (!r.chance(rate)) return null;
   const al = alive(s);
   const sceneSeen = (x) => x.o.some((o) => (o.fx || []).some((f) => f[0] === 'nextcx' && (s.seen.includes(`${adv.id}_cx_ch_${f[1]}`) || s.pending.some((p) => p.id === `${adv.id}_cx_ch_${f[1]}`))));
-  const fits = (x) => (x.sits.includes(sit) || (e.cat === 'humour' && x.sits.includes('people'))) && reqOK(s, adv, x.req) && (sit !== 'em' || cast.t) && !sceneSeen(x);
+  const fits = (x) => (!x.env || x.env.includes(envOf(adv))) && (x.sits.includes(sit) || (e.cat === 'humour' && x.sits.includes('people'))) && reqOK(s, adv, x.req) && (sit !== 'em' || cast.t) && !sceneSeen(x);
   s.bt.copt ||= {};
   const pool = [
     ...adv.chaos.filter((x) => fits(x) && (!x.notT || al.length >= 2)).map((x) => ({ x, who: null })),
@@ -669,6 +672,46 @@ function applyFx(s, adv, fx, ctx) {
   }
 }
 
+// ---------- ridiculous accidents ----------
+// Rarely, an injury or death that a decision ALREADY caused turns out to have a
+// ridiculous cause. Only single-person injuries in ordinary scenes qualify, never
+// story moments (sacrifices, finales, betrayals) and never someone who was fine.
+const MISHAP_OK_FX = new Set(['hurt', 'bite', 'kill', 'time', 'em', 'lose', 'use', 'useany', 'funny', 'mem', 'move', 'moveRandom', 'shortcut', 'rest', 'scavenge']);
+export const MISHAP_RATE = { hurt: 0.08, death: 0.05, max: 3, maxDeaths: 1, gap: 4 };
+const FLEE_WORDS = /run|flee|escape|sprint|dash|bolt|leg it|get out|climb|jump|hide|door|back off|retreat|rush|charge|go for it|race|chase/i;
+function tryMishap(s, adv, ev, o, label, ctx) {
+  if (!s.bt || !['hurt', 'death'].includes(o.k)) return null;
+  if (!ev || ev.major || ['moral', 'finale', 'turn', 'timeout', 'rescue', 'opening'].includes(ev.cat)) return null;
+  if (!(o.fx || []).every((f) => MISHAP_OK_FX.has(f[0]) && !(f[0] === 'kill' && f[3] === 'hero'))) return null;
+  const main = ctx.hurt.filter((id) => !ctx.extraHurt.includes(id));
+  const victims = [...new Set([...main, ...ctx.deaths.filter((id) => !ctx.extraHurt.includes(id))])];
+  if (victims.length !== 1) return null;
+  const c = charById(s, victims[0]);
+  if (!c || (c.infected && c.infected.resolved === false)) return null;
+  const death = !c.alive;
+  const list = (s.bt.mishaps ||= []);
+  if (list.length >= MISHAP_RATE.max || (death && list.filter((m) => m.death).length >= MISHAP_RATE.maxDeaths)) return null;
+  if (list.length && s.stage - list[list.length - 1].stage < MISHAP_RATE.gap) return null;
+  const r = rngOf(s);
+  if (!r.chance(death ? MISHAP_RATE.death : MISHAP_RATE.hurt)) return null;
+  const flee = ev.cat === 'emergency' || death || FLEE_WORDS.test(label || '');
+  const m = pickMishap(s, adv, r, { flee, death });
+  if (!m) return null;
+  const W = adv.words || {};
+  const tok = { v: c.name, ZSU: String(W.zs || 'zombies').toUpperCase() };
+  const text = fill(s, adv, mishapText(m, r, death), { ...ctx, tok });
+  if (death) {
+    c.cause = m.short;
+    const d = [...s.log.deaths].reverse().find((x) => x.id === c.id);
+    if (d) { d.cause = m.short; d.mishap = true; }
+  }
+  (s.bt.mishapIds ||= []).push(m.id);
+  list.push({ id: m.id, who: c.id, stage: s.stage, death, short: m.short });
+  if (!death) remember(s, 'mishap', c.id, false);
+  s.log.funny.push({ stage: s.stage, text, mishap: true });
+  return { id: m.id, who: c.id, death, text, short: m.short, r: m.r, tok };
+}
+
 function resolveOutcome(s, adv, ev, o, label, meta = {}) {
   const r = rngOf(s);
   const ctx = { cast: { ...s.cur.cast }, deaths: [], hurt: [], healed: [], gained: [], lost: [], extraHurt: [], adv, resolving: true, npcId: s.cur.npc, npc: s.cur.npc ? npcName(adv, s.cur.npc) : undefined };
@@ -676,6 +719,8 @@ function resolveOutcome(s, adv, ev, o, label, meta = {}) {
   if (meta.chaos && ctx.cast.v) { const others = alive(s).filter((c) => c.id !== ctx.cast.v); if (others.length) { const c = r.weighted(others, (c) => 1 / Math.pow(1 + c.danger, 2)); ctx.r = c.id; ctx.cast.r = c.id; } }
   applyFx(s, adv, o.fx, ctx);
   let text = fill(s, adv, o.t, ctx);
+  const mishap = meta.chaos ? null : tryMishap(s, adv, ev, o, label, ctx);
+  if (mishap) text = mishap.text;
   if (ctx.saved) text += ' ' + ctx.saved.join(' ');
   // while someone is infected, the team might stumble on a cure
   const sick = alive(s).filter((c) => c.infected && c.infected.resolved === false && c.infected.at < s.stage);
@@ -709,7 +754,21 @@ function resolveOutcome(s, adv, ev, o, label, meta = {}) {
   }
   const H = { alive, fill, r };
   const rsay = s.bt ? reactionBanter(s, adv, H, { kind: o.k, cat: ev?.cat, chaos: !!meta.chaos, searched: !!meta.searched, hurtId: ctx.hurt.find((id) => charById(s, id)?.alive), itemName: ctx.gained.length ? adv.items[ctx.gained[0]].name : '', deaths: ctx.deaths.length > 0 }) : [];
-  s.last = { choice: label, text, say: rsay, chaos: !!meta.chaos, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), left: ctx.leftBehind || [], kind: o.k };
+  const say = mishap ? mishapBanter(s, adv, H, mishap) : rsay;
+  // for the end-of-story recap: who did what
+  if (s.bt) {
+    const T = (s.bt.tally ||= {});
+    for (const id of ctx.hurt) { (T.wounds ||= {})[id] = (T.wounds[id] || 0) + 1; }
+    const who = meta.silly ? ctx.cast.v : null;
+    if (who) (s.log.acts ||= []).push({ stage: s.stage, who, label: fill(s, adv, label, ctx), kind: o.k, p: meta.p ?? 1 });
+    if (meta.chaos || mishap) {
+      const q = (s.log.quotes ||= []);
+      for (const l of say) if (l.who && /^\(?[^"]{0,30}"/.test(l.text)) q.push({ who: l.who, text: l.text });
+      for (const m of text.matchAll(/(?:^|\n)([A-Z][\w' -]{1,20}): ("[^"\n]{6,140}")/g)) { const c = s.party.find((p) => p.name === m[1].trim()); if (c) q.push({ who: c.id, text: m[2] }); }
+      if (q.length > 60) q.splice(0, q.length - 60);
+    }
+  }
+  s.last = { choice: label, text, say, mishap: mishap ? mishap.short : null, chaos: !!meta.chaos, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), left: ctx.leftBehind || [], kind: o.k };
   s.clock -= 1;
   s.zoneStages++;
   const wasFinale = ev && ev.cat === 'finale';
@@ -729,7 +788,8 @@ export function choose(s, adv, displayIndex) {
   const c = ch.chaos ? optionById(ch.chaos) : ev.choices[ch.i];
   const os = effectiveOutcomes(s, adv, c.o, ev);
   const o = rngOf(s).weighted(filterLoyalty(s, os, s.cur.npc), (x) => x.p);
-  return resolveOutcome(s, adv, ev, o, ch.label, { chaos: !!ch.chaos || String(s.cur.id).includes('_cx_ch_'), searched: /search|look|raid|check|explore/i.test(ch.label) });
+  const tot = os.reduce((a, x) => a + x.p, 0) || 1;
+  return resolveOutcome(s, adv, ev, o, ch.label, { chaos: !!ch.chaos || String(s.cur.id).includes('_cx_ch_'), searched: /search|look|raid|check|explore/i.test(ch.label), p: o.p / tot, silly: !!ch.chaos });
 }
 
 // ---------- items ----------
@@ -892,6 +952,7 @@ export function updateReplay(replay, s) {
   if (s.ending) { const en = (rp.endings[s.adv] ||= {}); en[s.ending.id] = (en[s.ending.id] || 0) + 1; }
   rp.recent.unshift({ adv: s.adv, seed: s.seed, ending: s.ending?.id, date: Date.now() });
   rp.recent = rp.recent.slice(0, 20);
+  rp.mishaps = [...(s.bt?.mishapIds || []), ...(rp.mishaps || [])].slice(0, 30);
   return rp;
 }
 
@@ -904,6 +965,7 @@ export function historyRecord(s, adv) {
     survivors: s.party.filter((c) => c.alive).length, deaths: s.party.filter((c) => !c.alive).length,
     decisions: s.log.decisions.map((d) => ({ stage: d.stage, choice: d.choice, major: d.major, title: d.title })),
     events: s.seen.slice(), discoveries: s.log.discoveries, itemsUsed: s.log.itemsUsed, funny: s.log.funny, heroic: s.log.heroic, deathLog: s.log.deaths, npcs: s.npcs, companions: companionSummary(s, adv),
+    recap: s.bt ? buildRecap(s) : null,
   };
 }
 

@@ -4,6 +4,7 @@
 // description (pets, baking, gaming, selfies...). Dead characters never speak and
 // never get options: everything here checks who is alive.
 import { O } from './kit.js';
+import { EXTRA, BUDZ } from './crewbanter.js';
 
 // lines: by situation. A line can be { t, need: ['bravo'] } when it mentions someone.
 // convos: [speaker, text]. Speakers: 'me', another persona key, 'b'/'c' (anyone else), '-' (stage direction).
@@ -419,6 +420,16 @@ export const PERSONAS = {
     ],
   },
 };
+
+// extra lines, conversations and decisions for everyone (see crewbanter.js)
+PERSONAS.budz = BUDZ;
+for (const [k, e] of Object.entries(EXTRA)) {
+  const p = PERSONAS[k];
+  if (!p) continue;
+  for (const [ctx, lines] of Object.entries(e.lines || {})) p.lines[ctx] = [...(p.lines[ctx] || []), ...lines];
+  p.convos.push(...(e.convos || []));
+  p.options.push(...(e.options || []));
+}
 
 // ---------------- custom characters: interests read from tags and description ----------------
 const PACKS = [
