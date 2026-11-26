@@ -8,6 +8,7 @@ import { personaKey, petOf } from './persona.js';
 import { newGame, choose, dropItem, packSlots, itemUsable, useItem, findItemUse, formatClock, historyRecord, updateReplay, statsFrom, hpLabel, MAX_HP, listNames, companionSummary, npcName, ROLES, DIFFICULTY, MAX_PARTY, infectDelay, mercyKill } from './engine.js';
 import { makeSeed, cleanSeed } from './rng.js';
 import { sceneSVG } from './scenes.js';
+import { buildRecap } from './recap.js';
 import { iconSVG } from './icons.js';
 
 const app = document.getElementById('app');
@@ -58,8 +59,33 @@ async function refreshCrew() {
   S.settings.crewV4 = true; S.settings.crewV5 = true;
   try { await S.store.setSettings(S.settings); } catch {}
 }
+// Update 22: Budz joins the crew (unless there is already a Budz, or the library is full).
+async function addBudz() {
+  if (S.settings.crewV6 || !S.settings.crewV2) return; // a brand-new library gets him with everyone else
+  if (!S.chars.some((c) => c.name.trim().toLowerCase() === 'budz') && S.chars.length < MAX_CHARACTERS) {
+    const b = starterCrew(S.chars.map((c) => c.name)).find((c) => c.name === 'Budz');
+    if (b) { try { await S.store.saveCharacter(b); S.chars.push(b); } catch {} }
+  }
+  S.settings.crewV6 = true;
+  try { await S.store.setSettings(S.settings); } catch {}
+}
+// Update 23: Budz's hobbit look (pointed ears, bigger ring), only if nobody has restyled him.
+async function refreshBudz() {
+  if (S.settings.crewV7) return;
+  const i = S.chars.findIndex((c) => c.id === 'c_starter_budz');
+  const c = S.chars[i];
+  if (c && !c.avatar.ears) {
+    const fresh = starterCrew([]).find((x) => x.name === 'Budz');
+    const same = ['hair', 'hairColour', 'acc', 'outfit'].every((k) => c.avatar[k] === fresh.avatar[k]);
+    if (same) { S.chars[i] = { ...c, avatar: fresh.avatar }; try { await S.store.saveCharacter(S.chars[i]); } catch {} }
+  }
+  S.settings.crewV7 = true;
+  try { await S.store.setSettings(S.settings); } catch {}
+}
 async function seedTeamLeyla() {
   await refreshCrew();
+  await addBudz();
+  await refreshBudz();
   // Update 12: Chris's look was refined. Only touch him if he is still the untouched Update 11 version.
   if (!S.settings.crewV3) {
     const i = S.chars.findIndex((c) => c.id === 'c_starter_chris');
@@ -78,7 +104,7 @@ async function seedTeamLeyla() {
   S.chars = S.chars.filter((c) => !old.includes(c));
   const crew = starterCrew(S.chars.map((c) => c.name)).slice(0, Math.max(0, MAX_CHARACTERS - S.chars.length));
   for (const c of crew) { try { await S.store.saveCharacter(c); S.chars.push(c); } catch {} }
-  S.settings.crewV2 = true;
+  S.settings.crewV2 = true; S.settings.crewV6 = true;
   try { await S.store.setSettings(S.settings); } catch {}
 }
 
@@ -363,6 +389,7 @@ const SCREENS = {
       <div class="panel"><div class="lbl">THE TEAM</div><div class="end-roster">${g.party.map((c) => `<div class="end-char ${c.alive ? '' : 'dead'}"><div class="pic">${avatarSVG(c.avatar, { size: 56 })}${c.alive ? '' : '<div class="xmark">✕</div>'}</div><b>${h(c.name)}</b><span>${c.alive ? (c.infected && c.infected.resolved !== 'cured' ? 'Survived… infected' : hpLabel(c.hp)) : h(c.cause)}</span></div>`).join('')}</div></div>
       ${streamOn() ? `<p class="center thanks">Thanks for playing, chat! 💜</p>` : ''}
       ${companionSummary(g, a).length ? `<div class="panel"><div class="lbl">COMPANIONS — THE TRUTH</div>${companionSummary(g, a).map((c) => `<div class="comp-row"><b>${h(c.name)}</b> <span class="chip ${c.loyalty === 'loyal' ? 'g' : c.loyalty === 'traitor' ? 'r' : ''}">${c.loyalty === 'loyal' ? '✔ Loyal' : c.loyalty === 'traitor' ? '☠ Traitor' : 'Ordinary'}</span> <small>${c.died ? h(c.cause || 'died') : c.stayed ? 'stayed to the end' : c.loyalty === 'traitor' ? 'betrayed the group' : 'went their own way'}</small></div>`).join('')}</div>` : ''}
+      ${recapHTML(g)}
       ${list('MAJOR DECISIONS', majors, (d) => `<b>Stage ${d.stage}:</b> ${h(d.choice)}`)}
       ${list('HEROIC MOMENTS', g.log.heroic.slice(0, 6), (d) => h(d.text))}
       ${list('FUNNY MOMENTS', g.log.funny.slice(0, 6), (d) => h(d.text))}
@@ -396,6 +423,7 @@ const SCREENS = {
           <button class="hist-head" data-a="histToggle" data-id="${r.id}"><span><b>${h(r.advTitle)}</b> · ${h(r.ending?.title || '')}</span><small>${new Date(r.date).toLocaleString()} · ${r.survivors}/${r.party.length} survived · seed ${h(r.seed)}</small></button>
           ${S.histOpen === r.id ? `<div class="hist-body"><div class="end-roster">${r.party.map((c) => `<div class="end-char ${c.alive ? '' : 'dead'}"><div class="pic">${avatarSVG(c.avatar, { size: 40 })}${c.alive ? '' : '<div class="xmark">✕</div>'}</div><b>${h(c.name)}</b><span>${c.alive ? 'Survived' : h(c.cause || 'Died')}</span></div>`).join('')}</div>
             <p><b>Ending:</b> ${h(r.ending?.cat)} · <b>Objective:</b> ${r.objective ? 'completed' : 'failed'} · <b>Stages:</b> ${r.stages}</p>
+            ${r.recap?.awards?.length ? `<details><summary>Awards (${r.recap.awards.length})</summary><ul>${r.recap.awards.map((x) => `<li><b>${h(x.title)}:</b> ${h(x.name)} — ${h(x.text)}</li>`).join('')}</ul></details>` : ''}
             <details><summary>Decisions (${r.decisions.length})</summary><ol>${r.decisions.map((d) => `<li>${h(d.choice)}</li>`).join('')}</ol></details>
             <p class="note">${r.events.length} story events encountered.</p></div>` : ''}
         </div>`).join('') : '<p class="note pad">No adventures finished yet.</p>'}
@@ -404,6 +432,15 @@ const SCREENS = {
     </div>`;
   },
 };
+
+// End-of-story awards and how everyone ended up (only what really happened).
+function recapHTML(g) {
+  if (!g.bt) return '';
+  const rc = buildRecap(g);
+  const aw = rc.awards.map((x) => `<div class="aw"><div class="aw-t">${h(x.title)}</div><div class="aw-n">${h(x.name)}</div><div class="aw-x">${h(x.text)}</div></div>`).join('');
+  const ppl = rc.people.map((p) => `<li class="${p.alive ? '' : 'dead'}"><b>${h(p.name)}</b> — ${h(p.status)}.${p.cause ? ` <span class="cause">Cause of death: ${h(p.cause)}.</span>` : ''}${p.note ? ` <span class="ach">Notable achievement: ${h(p.note)}.</span>` : ''}</li>`).join('');
+  return `${aw ? `<div class="panel"><div class="lbl">🏆 THE AWARDS</div><div class="awards">${aw}</div></div>` : ''}<div class="panel"><div class="lbl">THE RECAP</div><ul class="recap">${ppl}</ul></div>`;
+}
 
 function infectedBanner(g, a) {
   const sick = g.party.filter((c) => c.alive && c.infected && c.infected.resolved === false);
@@ -444,6 +481,7 @@ const TUT_STEPS = [
   { sel: '.pack.panel', before: () => { S.pack = { item: S.game.inv[0]?.id || null, confirm: false, msg: '' }; render(); }, title: 'Using items', text: 'Tap an item to see what it does, then use it. Healing items work any time. Others only work in the right situation. Try one at the right moment and it can unlock a secret outcome!' },
   { sel: '[data-a="homeConfirm"]', before: () => { S.pack = null; render(); }, title: 'Home 🏠', text: 'Your adventure saves automatically after every decision, so you can leave and carry on later.' },
   { sel: '[data-a="textSize"]', title: 'Text size', text: 'Aa makes the text bigger. Handy when you are streaming.' },
+  { title: 'Accidents and awards', text: 'Every now and then, an injury turns out to have a completely ridiculous cause. A pull door. A banana peel. A very loud packet of crisps. At the end, everyone gets awards like Most Heroic and Most Embarrassing, plus how they ended up, all from what really happened in your story.' },
   { title: 'Endings', text: 'Each adventure has lots of different endings, good and bad, and your choices decide which one you get. Some strangers can be trusted. Some cannot. Now go and start a real adventure. Good luck!' },
 ];
 

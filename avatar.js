@@ -31,6 +31,7 @@ const HAIRSTYLES = {
   'Long fringe': ['', '', '....HHHHHHHH....', '..HHHHHHHHHHHH..', '.HHHHHhHHHhHHHH.', '.HHHHH.HH.HHHHH.', '.HHH.H....H.hHH.', '.HHh........hHH.', '.HH..........HH.', '.HH..........HH.', '.hH..........Hh.', '.HH..........HH.', '.hH..........Hh.', 'HHH..........HHH', 'HhH..........HhH', 'Hh............hH'],
   'Long wavy': ['', '', '...HHHHHHHHHH...', '..HHHHhHHHhHHH..', '.HHhHHHHHHHHhHH.', '.HHHH.H..H.HHHH.', '.HhH........HhH.', '.HH..........HH.', 'Hh............hH', '.HH..........HH.', '.hH..........Hh.', 'HH............HH', '.Hh..........hH.', '.HH..........HH.', 'hH............Hh', '.h............h.'],
   'Huge spiky': ['H..H.HH..HH.H..H', 'HH.HHHH.HHHHHHHH', '.HHHHHHHHHHHHHH.', 'HHHHhHHHHHhHHHHH', '.HHHHHHHHHHHHHH.', '..HHhH.HH.HhHH..', '..HH.H....H.HH..', '..H..........H..'],
+  'Hobbit curls': ['', '...hH.HhH.HhH...', '..HHhHHHhHHHhH..', '.HhHHhHHhHHhHHh.', '.HHhHHhHHhHHhHH.', '.HhH.hH..Hh.HhH.', '.hH..........Hh.', '.H............H.'],
 };
 const HAIR_KEYS = Object.keys(HAIRSTYLES);
 
@@ -39,9 +40,9 @@ const MOUTHS = ['Smile', 'Neutral', 'Grin', 'Shocked', 'Smirk', 'Frown'];
 const BEARDS = ['None', 'Stubble', 'Full beard', 'Goatee', 'Long beard', 'Chinstrap', 'Soul patch', 'Short beard'];
 const STACHES = ['None', 'Classic', 'Thin', 'Handlebar', 'Walrus', 'Horseshoe'];
 const EYEWEAR = ['None', 'Round glasses', 'Square glasses', 'Sunglasses', 'Aviators', 'Goggles', 'Eyepatch', 'Monocle'];
-const OUTFITS = ['None', 'Suit & bow tie', 'Army', 'Hoodie', 'T-shirt', 'Scrubs'];
+const OUTFITS = ['None', 'Suit & bow tie', 'Army', 'Hoodie', 'T-shirt', 'Scrubs', 'Waistcoat'];
 const HATS = ['None', 'Cap', 'Beanie', 'Cowboy hat', 'Hard hat', 'Headband', 'Bandana', 'Top hat', 'Bucket hat', 'Helmet', 'Headphones', 'Party hat', 'Flower crown', 'Chef hat', 'Headscarf', 'Cat ears'];
-const ACCS = ['None', 'Earring', 'Scar', 'Plaster', 'Freckles', 'Blush', 'Face paint', 'Face mask', 'Mole', 'Nose ring', 'Whiskers', 'Silhouette'];
+const ACCS = ['None', 'Earring', 'Scar', 'Plaster', 'Freckles', 'Blush', 'Face paint', 'Face mask', 'Mole', 'Nose ring', 'Whiskers', 'Silhouette', 'Ring necklace'];
 
 export const AVATAR_OPTIONS = [
   { key: 'skin', label: 'Skin tone', count: SKINS.length, name: (i) => SKIN_NAMES[i] },
@@ -58,11 +59,12 @@ export const AVATAR_OPTIONS = [
   { key: 'hatColour', label: 'Headwear colour', count: HAT_COLOURS.length, name: (i) => HAT_NAMES[i] },
   { key: 'acc', label: 'Accessory', count: ACCS.length, name: (i) => ACCS[i] },
   { key: 'outfit', label: 'Outfit', count: OUTFITS.length, name: (i) => OUTFITS[i] },
+  { key: 'ears', label: 'Ears', count: 2, name: (i) => ['Normal', 'Pointy'][i] },
   { key: 'bg', label: 'Background', count: BGS.length, name: (i) => `Colour ${i + 1}` },
 ];
 
 export function defaultAvatar() {
-  return { skin: 2, hair: 2, hairColour: 1, eyes: 0, eyeColour: 0, mouth: 0, beard: 0, stache: 0, facialColour: 1, eyewear: 0, hat: 0, hatColour: 0, acc: 0, outfit: 0, bg: 0 };
+  return { skin: 2, hair: 2, hairColour: 1, eyes: 0, eyeColour: 0, mouth: 0, beard: 0, stache: 0, facialColour: 1, eyewear: 0, hat: 0, hatColour: 0, acc: 0, outfit: 0, ears: 0, bg: 0 };
 }
 
 export function randomAvatar(rand = Math.random) {
@@ -76,9 +78,10 @@ export function randomAvatar(rand = Math.random) {
   if (rand() < 0.5) a.acc = 0;
   if (rand() < 0.7) a.hairColour = Math.floor(rand() * 9);
   if (a.skin >= 10) a.skin = Math.floor(rand() * 10);
-  if (ACCS[a.acc] === 'Silhouette' || ACCS[a.acc] === 'Whiskers') a.acc = 0;
+  if (['Silhouette', 'Whiskers', 'Ring necklace'].includes(ACCS[a.acc])) a.acc = 0;
   if (HATS[a.hat] === 'Cat ears') a.hat = 0;
   if (rand() < 0.5) a.outfit = 0;
+  if (rand() < 0.85) a.ears = 0;
   a.facialColour = a.hairColour;
   return a;
 }
@@ -172,8 +175,23 @@ export function avatarGrid(av) {
     shoulders(hatC, hatD); rect(4, 15, 8, 1, hatD); px(6, 15, '#e8e8ee'); px(9, 15, '#e8e8ee');
   } else if (out === 'T-shirt') {
     shoulders(hatC, hatD); rect(6, 15, 4, 1, skinD);
+  } else if (out === 'Waistcoat') {
+    // white shirt under a buttoned waistcoat (headwear colour), brass buttons
+    shoulders('#f1ece0', '#cfc8b6'); rect(2, 15, 4, 1, hatC); rect(10, 15, 4, 1, hatC); px(1, 14, '#f1ece0'); px(14, 14, '#f1ece0'); px(5, 15, hatD); px(10, 15, hatD); px(3, 15, '#d4a73a'); px(12, 15, '#d4a73a');
   } else if (out === 'Scrubs') {
     shoulders('#5fa8a0', '#3f7f78'); rect(6, 15, 4, 1, skinD); px(7, 15, '#3f7f78');
+  }
+
+  // a gold ring hanging on a chain round the neck
+  if (acc === 'Ring necklace') {
+    const ch = '#b8902e', gold = '#e8c04a', shine = '#fff2b0';
+    const edge = '#5a3e0c', hole = '#24180a';
+    // the chain runs down from both sides of the neck to the ring
+    px(3, 13, ch); px(4, 14, ch); px(5, 14, ch); px(12, 13, ch); px(11, 14, ch); px(10, 14, ch);
+    // a chunky gold ring with a dark outline, hanging under the chin
+    px(6, 13, edge); px(7, 13, gold); px(8, 13, shine); px(9, 13, edge);
+    px(6, 14, gold); px(7, 14, hole); px(8, 14, hole); px(9, 14, gold);
+    px(6, 15, edge); px(7, 15, gold); px(8, 15, gold); px(9, 15, edge);
   }
 
   // beard
@@ -210,6 +228,11 @@ export function avatarGrid(av) {
     const grey = greying && (x * 7 + y * 3) % 5 === 0 ? (x < 4 || x > 11 ? '#c9c6cf' : '#9b9aa3') : null;
     if (row[x] === 'H') px(x, y, grey || hairC); else if (row[x] === 'h') px(x, y, grey || hairD);
   } });
+
+  // pointed ears poke out past the hair
+  if (a.ears === 1) {
+    for (const [x, d] of [[0, 1], [15, -1]]) { const sx = x + d; px(x, 2, skinDD); px(x, 3, skinD); px(x, 4, skin); px(x, 5, skin); px(x, 6, skin); px(x, 7, skinD); px(x, 8, skinD); px(sx, 5, skinD); px(sx, 6, skin); px(sx, 7, skinDD); px(sx, 8, skinDD); px(sx, 9, skin); px(sx, 10, skinD); }
+  }
 
   // eyewear
   const ew = EYEWEAR[a.eyewear];
