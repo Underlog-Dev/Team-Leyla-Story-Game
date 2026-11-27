@@ -481,7 +481,7 @@ const TUT_STEPS = [
   { sel: '.pack.panel', before: () => { S.pack = { item: S.game.inv[0]?.id || null, confirm: false, msg: '' }; render(); }, title: 'Using items', text: 'Tap an item to see what it does, then use it. Healing items work any time. Others only work in the right situation. Try one at the right moment and it can unlock a secret outcome!' },
   { sel: '[data-a="homeConfirm"]', before: () => { S.pack = null; render(); }, title: 'Home 🏠', text: 'Your adventure saves automatically after every decision, so you can leave and carry on later.' },
   { sel: '[data-a="textSize"]', title: 'Text size', text: 'Aa makes the text bigger. Handy when you are streaming.' },
-  { title: 'Accidents and awards', text: 'Every now and then, an injury turns out to have a completely ridiculous cause. A pull door. A banana peel. A very loud packet of crisps. At the end, everyone gets awards like Most Heroic and Most Embarrassing, plus how they ended up, all from what really happened in your story.' },
+  { title: 'Accidents, ghosts and awards', text: 'Every now and then, an injury turns out to have a completely ridiculous cause. A pull door. A banana peel. A very loud packet of crisps. And a teammate who died earlier might come back as a zombie, much later, when everyone has forgotten about them. At the end, everyone gets awards like Most Heroic and Most Embarrassing, plus how they ended up, all from what really happened in your story.' },
   { title: 'Endings', text: 'Each adventure has lots of different endings, good and bad, and your choices decide which one you get. Some strangers can be trusted. Some cannot. Now go and start a real adventure. Good luck!' },
 ];
 

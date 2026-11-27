@@ -10,6 +10,7 @@
 //   {n}  a running count                         {@key} whoever a memory is about
 
 import { HURT_REACT, DEATH_REACT, envOf } from './mishaps.js';
+import { REACT as RETURN_REACT, HINTS as RETURN_HINTS } from './returners.js';
 import { PERSONAS, personaOf, personaKey, packsOf, birthdayToday } from './persona.js';
 
 // ---------------- voices ----------------
@@ -626,13 +627,56 @@ export function mishapBanter(s, adv, H, m) {
     if (cast) out = render(s, adv, H, lines, cast, extra);
   }
   // a personal reaction from someone with their own way of talking
-  const pers = others.filter((c) => personaOf(c)?.lines?.[m.death ? 'mishapdeath' : 'mishap']);
+  const spoke = new Set(out.map((l) => l.who));
+  const pers = others.filter((c) => personaOf(c)?.lines?.[m.death ? 'mishapdeath' : 'mishap'] && !spoke.has(c.id));
   if (pers.length && r.chance(0.6)) {
     const c = r.pick(pers);
     const l = voiceLine(s, adv, H, c, m.death ? 'mishapdeath' : 'mishap', extra);
     if (l && personaOf(c)) out.push(l);
   }
   return out;
+}
+
+// After a lost teammate comes back as one of the infected.
+export function returnBanter(s, adv, H, m) {
+  const r = H.r;
+  const others = H.alive(s).filter((c) => c.id !== m.who);
+  const out = [];
+  if (m.callback) out.push({ who: null, text: m.callback, aside: true });
+  if (!others.length) return out;
+  const extra = { ...m.tok, h: m.tok.v };
+  const fits = (lines) => [...new Set(lines.map((l) => l[0]).filter((k) => k !== '-'))].length <= others.length;
+  const pool = RETURN_REACT.map((l, i) => ({ l, id: 'rt' + i })).filter((x) => fits(x.l) && !s.bt.used.includes(x.id) && !(s.bt.avoidReact || []).includes(x.id));
+  const pick = pool.length ? r.pick(pool) : null;
+  if (pick) {
+    s.bt.used.push(pick.id);
+    const slots = [...new Set(pick.l.map((l) => l[0]).filter((k) => k !== '-'))];
+    const cast = castLines(s, H, slots, null, {});
+    if (cast) out.push(...render(s, adv, H, pick.l, cast, extra));
+  }
+  // someone with their own way of talking reacts too
+  const spoke = new Set(out.map((l) => l.who));
+  const pers = others.filter((c) => personaOf(c)?.lines?.returned && !spoke.has(c.id));
+  if (pers.length && r.chance(0.6)) {
+    const l = voiceLine(s, adv, H, r.pick(pers), 'returned', extra);
+    if (l) out.push(l);
+  }
+  return out;
+}
+// A rare hint that someone who died is still out there.
+export function returnHint(s, adv, H, ready) {
+  const r = H.r;
+  const al = H.alive(s);
+  const c = ready.find((x) => !x.zombie?.hinted);
+  if (!c || al.length < 1 || s.bt.hinted || !r.chance(0.08)) return [];
+  s.bt.hinted = true;
+  (c.zombie ||= { state: 'risen', times: 0, last: 0, hurt: [], killed: [] }).hinted = true;
+  if (!c.zombie.times) c.zombie.times = 0;
+  const pool = RETURN_HINTS.filter((h, i) => !s.bt.used.includes('rh' + i));
+  if (!pool.length) return [];
+  const h = r.pick(pool);
+  s.bt.used.push('rh' + RETURN_HINTS.indexOf(h));
+  return [{ who: null, aside: true, text: H.fill(s, adv, h, { tok: { d: c.name, a: r.pick(al).name } }) }];
 }
 
 // ---------------- character editor: how will they talk? ----------------

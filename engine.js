@@ -2,10 +2,11 @@
 // seeded Rng whose state lives in the game state, so saves resume exactly.
 import { Rng, hashSeed } from './rng.js';
 import { POOL } from './kit.js';
-import { initBanter, remember, sceneBanter, griefBanter, reactionBanter, mishapBanter } from './banter.js';
+import { initBanter, remember, sceneBanter, griefBanter, reactionBanter, mishapBanter, returnBanter, returnHint } from './banter.js';
 import { CHAOS_BY_ID, SITUATION, ZNAMES } from './chaos.js';
 import { pickMishap, mishapText, envOf } from './mishaps.js';
 import { buildRecap } from './recap.js';
+import { canTurn, pickEncounter, encounterText, REACT as RETURN_REACT, MISHAP_CALLBACK, HINTS } from './returners.js';
 import { characterOptions, OPTION_BY_ID, personaKey, petOf, signLine, renameText } from './persona.js';
 const optionById = (id) => CHAOS_BY_ID[id] || OPTION_BY_ID[id];
 
@@ -80,6 +81,7 @@ export function newGame(adv, characters, seed, { replay = null, useReplay = true
   s.zoneQuota = s.quotas[0];
   initBanter(s, r); s.bt.zname = r.pick(ZNAMES);
   if (replay?.mishaps) s.bt.avoidMishaps = replay.mishaps.slice(0, 30);
+  if (replay?.returns) s.bt.avoidReturns = replay.returns.slice(0, 10);
   for (const [id, q] of (adv.startKit?.[s.diff] || [])) { const d = adv.items[id]; if (d) s.inv.push({ id, qty: q || d.qty || 1 }); }
   const opening = r.weighted(adv.events.filter((e) => e.cat === 'opening' && reqOK(s, adv, e.req) && castable(s, e)), (e) => (e.w || 1) * (s.rw[e.id] ?? 1));
   s.pending.push({ id: opening.id });
@@ -404,6 +406,8 @@ function renderEvent(s, adv, e, cast) {
     // banter between the survivors: conversations, running jokes, callbacks
     say.push(...sceneBanter(s, adv, H, e, { hasSay: say.length > 0 }));
   }
+  // now and then, a hint that a lost teammate is still out there
+  if (s.bt) say.push(...returnHint(s, adv, H, returnable(s)));
   const ci = pickChoices(s, adv, e, cast);
   const chaos = pickChaos(s, adv, e, cast, ci);
   const choices = ci.map((i) => {
@@ -555,7 +559,8 @@ function pickTarget(s, who, ctx) {
 function die(s, c, cause, ctx) {
   if (!c.alive) return;
   c.alive = false; c.hp = 0; c.cause = cause || 'succumbed to their injuries'; c.diedAt = s.stage;
-  s.log.deaths.push({ id: c.id, name: c.name, cause: c.cause, stage: s.stage, loc: adv_locName(s, ctx) });
+  c.diedLoc = s.loc; c.turnable = canTurn(c.cause);
+  s.log.deaths.push({ id: c.id, name: c.name, cause: c.cause, stage: s.stage, loc: adv_locName(s, ctx), turnable: c.turnable });
   s.recentDeaths.push(c.id);
   ctx.deaths.push(c.id);
 }
@@ -679,15 +684,71 @@ function applyFx(s, adv, fx, ctx) {
 const MISHAP_OK_FX = new Set(['hurt', 'bite', 'kill', 'time', 'em', 'lose', 'use', 'useany', 'funny', 'mem', 'move', 'moveRandom', 'shortcut', 'rest', 'scavenge']);
 export const MISHAP_RATE = { hurt: 0.08, death: 0.05, max: 3, maxDeaths: 1, gap: 4 };
 const FLEE_WORDS = /run|flee|escape|sprint|dash|bolt|leg it|get out|climb|jump|hide|door|back off|retreat|rush|charge|go for it|race|chase/i;
-function tryMishap(s, adv, ev, o, label, ctx) {
+// ---------- returning dead ----------
+// A teammate who died earlier in this story may come back as one of the infected
+// and be the one behind an injury or death that a decision ALREADY caused.
+export const RETURN_RATE = { chance: 0.12, wait: 5, gap: 3, max: 3, times: 2, putDown: 0.6 };
+function accidentVictim(s, ev, o, ctx, { allowFinale = false } = {}) {
   if (!s.bt || !['hurt', 'death'].includes(o.k)) return null;
-  if (!ev || ev.major || ['moral', 'finale', 'turn', 'timeout', 'rescue', 'opening'].includes(ev.cat)) return null;
+  const blocked = ['moral', 'turn', 'timeout', 'rescue', 'opening'].concat(allowFinale ? [] : ['finale']);
+  if (!ev || ev.major || blocked.includes(ev.cat)) return null;
   if (!(o.fx || []).every((f) => MISHAP_OK_FX.has(f[0]) && !(f[0] === 'kill' && f[3] === 'hero'))) return null;
   const main = ctx.hurt.filter((id) => !ctx.extraHurt.includes(id));
   const victims = [...new Set([...main, ...ctx.deaths.filter((id) => !ctx.extraHurt.includes(id))])];
   if (victims.length !== 1) return null;
   const c = charById(s, victims[0]);
   if (!c || (c.infected && c.infected.resolved === false)) return null;
+  return c;
+}
+// Teammates who could come back now: dead a while, could have turned, not put to rest.
+export function returnable(s) {
+  return s.party.filter((c) => !c.alive && c.turnable && c.diedAt != null && s.stage - c.diedAt >= RETURN_RATE.wait
+    && (!c.zombie || (c.zombie.state === 'risen' && c.zombie.times < RETURN_RATE.times && s.stage - c.zombie.last >= RETURN_RATE.gap)));
+}
+function tryReturn(s, adv, ev, o, label, ctx) {
+  const c = accidentVictim(s, ev, o, ctx, { allowFinale: true });
+  if (!c) return null;
+  const list = (s.bt.returns ||= []);
+  if (list.length >= RETURN_RATE.max) return null;
+  const pool = returnable(s).filter((d) => d.id !== c.id);
+  if (!pool.length) return null;
+  const r = rngOf(s);
+  if (!r.chance(RETURN_RATE.chance)) return null;
+  const d = r.pick(pool);
+  const death = !c.alive;
+  const others = alive(s).filter((x) => x.id !== c.id);
+  const again = (d.zombie?.times || 0) > 0;
+  const same = d.diedLoc === s.loc;
+  const flee = ev.cat === 'emergency' || ev.cat === 'finale' || FLEE_WORDS.test(label || '');
+  let e = pickEncounter(s, r, { flee, again, same, env: envOf(adv) });
+  if (e && !others.length && /\{a\}/.test(e.lead)) e = null;
+  if (!e) return null;
+  const a = others.length ? r.pick(others) : null;
+  // put down for good, or gone again (a second appearance always ends it)
+  const putDown = !!a && (again || r.chance(RETURN_RATE.putDown));
+  const z = (d.zombie ||= { state: 'risen', times: 0, last: 0, hurt: [], killed: [] });
+  z.times++; z.last = s.stage; (death ? z.killed : z.hurt).push(c.id);
+  if (putDown) z.state = 'gone';
+  const dloc = adv.locations?.[d.diedLoc]?.name || s.log.deaths.find((x) => x.id === d.id)?.loc || 'where they fell';
+  const tok = { d: d.name, v: c.name, a: a ? a.name : 'someone', dloc };
+  let text = fill(s, adv, encounterText(e, r, death, putDown), { ...ctx, tok });
+  const dm = (s.bt.mishaps || []).find((m) => m.who === d.id && m.death);
+  const callback = dm && MISHAP_CALLBACK[dm.id] ? fill(s, adv, MISHAP_CALLBACK[dm.id], { ...ctx, tok }) : '';
+  if (death) {
+    c.cause = `was killed by ${d.name}, who came back as one of the infected`;
+    const x = [...s.log.deaths].reverse().find((y) => y.id === c.id);
+    if (x) { x.cause = c.cause; x.by = d.id; }
+  }
+  (s.bt.returnIds ||= []).push(e.id);
+  list.push({ id: e.id, dead: d.id, who: c.id, stage: s.stage, death, putDown });
+  s.log.returns = list;
+  remember(s, 'returned', d.id, putDown);
+  return { kind: 'return', id: e.id, dead: d.id, who: c.id, death, putDown, text, callback, tok, short: `${d.name} came back` };
+}
+
+function tryMishap(s, adv, ev, o, label, ctx) {
+  const c = accidentVictim(s, ev, o, ctx);
+  if (!c) return null;
   const death = !c.alive;
   const list = (s.bt.mishaps ||= []);
   if (list.length >= MISHAP_RATE.max || (death && list.filter((m) => m.death).length >= MISHAP_RATE.maxDeaths)) return null;
@@ -719,8 +780,10 @@ function resolveOutcome(s, adv, ev, o, label, meta = {}) {
   if (meta.chaos && ctx.cast.v) { const others = alive(s).filter((c) => c.id !== ctx.cast.v); if (others.length) { const c = r.weighted(others, (c) => 1 / Math.pow(1 + c.danger, 2)); ctx.r = c.id; ctx.cast.r = c.id; } }
   applyFx(s, adv, o.fx, ctx);
   let text = fill(s, adv, o.t, ctx);
-  const mishap = meta.chaos ? null : tryMishap(s, adv, ev, o, label, ctx);
+  const returned = meta.chaos ? null : tryReturn(s, adv, ev, o, label, ctx);
+  const mishap = meta.chaos || returned ? null : tryMishap(s, adv, ev, o, label, ctx);
   if (mishap) text = mishap.text;
+  if (returned) text = returned.text;
   if (ctx.saved) text += ' ' + ctx.saved.join(' ');
   // while someone is infected, the team might stumble on a cure
   const sick = alive(s).filter((c) => c.infected && c.infected.resolved === false && c.infected.at < s.stage);
@@ -754,21 +817,21 @@ function resolveOutcome(s, adv, ev, o, label, meta = {}) {
   }
   const H = { alive, fill, r };
   const rsay = s.bt ? reactionBanter(s, adv, H, { kind: o.k, cat: ev?.cat, chaos: !!meta.chaos, searched: !!meta.searched, hurtId: ctx.hurt.find((id) => charById(s, id)?.alive), itemName: ctx.gained.length ? adv.items[ctx.gained[0]].name : '', deaths: ctx.deaths.length > 0 }) : [];
-  const say = mishap ? mishapBanter(s, adv, H, mishap) : rsay;
+  const say = returned ? returnBanter(s, adv, H, returned) : mishap ? mishapBanter(s, adv, H, mishap) : rsay;
   // for the end-of-story recap: who did what
   if (s.bt) {
     const T = (s.bt.tally ||= {});
     for (const id of ctx.hurt) { (T.wounds ||= {})[id] = (T.wounds[id] || 0) + 1; }
     const who = meta.silly ? ctx.cast.v : null;
     if (who) (s.log.acts ||= []).push({ stage: s.stage, who, label: fill(s, adv, label, ctx), kind: o.k, p: meta.p ?? 1 });
-    if (meta.chaos || mishap) {
+    if (meta.chaos || mishap || returned) {
       const q = (s.log.quotes ||= []);
       for (const l of say) if (l.who && /^\(?[^"]{0,30}"/.test(l.text)) q.push({ who: l.who, text: l.text });
       for (const m of text.matchAll(/(?:^|\n)([A-Z][\w' -]{1,20}): ("[^"\n]{6,140}")/g)) { const c = s.party.find((p) => p.name === m[1].trim()); if (c) q.push({ who: c.id, text: m[2] }); }
       if (q.length > 60) q.splice(0, q.length - 60);
     }
   }
-  s.last = { choice: label, text, say, mishap: mishap ? mishap.short : null, chaos: !!meta.chaos, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), left: ctx.leftBehind || [], kind: o.k };
+  s.last = { choice: label, text, say, mishap: mishap ? mishap.short : null, returned: returned ? returned.dead : null, chaos: !!meta.chaos, deaths: ctx.deaths.map((id) => nameOf(s, id)), hurt: ctx.hurt.map((id) => nameOf(s, id)), healed: ctx.healed.map((id) => nameOf(s, id)), gained: ctx.gained.map((id) => adv.items[id].name), lost: ctx.lost.map((id) => adv.items[id].name), left: ctx.leftBehind || [], kind: o.k };
   s.clock -= 1;
   s.zoneStages++;
   const wasFinale = ev && ev.cat === 'finale';
@@ -953,6 +1016,7 @@ export function updateReplay(replay, s) {
   rp.recent.unshift({ adv: s.adv, seed: s.seed, ending: s.ending?.id, date: Date.now() });
   rp.recent = rp.recent.slice(0, 20);
   rp.mishaps = [...(s.bt?.mishapIds || []), ...(rp.mishaps || [])].slice(0, 30);
+  rp.returns = [...(s.bt?.returnIds || []), ...(rp.returns || [])].slice(0, 10);
   return rp;
 }
 

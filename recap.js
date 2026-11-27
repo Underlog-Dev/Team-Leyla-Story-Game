@@ -70,8 +70,12 @@ export function buildRecap(s) {
   const rd = mish.find((m) => m.death);
   if (rd) add('Most ridiculous death', rd.who, cap(rd.short));
 
+  // came back from the dead
+  const back = s.party.filter((p) => p.zombie?.times > 0).sort((a, b) => (b.zombie.killed.length * 2 + b.zombie.hurt.length) - (a.zombie.killed.length * 2 + a.zombie.hurt.length))[0];
+  if (back) add('Most persistent', back.id, `Came back as a zombie${back.zombie.times > 1 ? ' twice' : ''}. Death was not enough`);
+
   // funniest quote
-  const q = (s.log.quotes || []).filter((x) => by(x.who) && x.text.length < 120);
+  const q = (s.log.quotes || []).filter((x) => by(x.who) && x.text.length >= 14 && x.text.length < 120);
   if (q.length) { const fresh = q.filter((x) => !won(x.who)); const x = r.pick(fresh.length ? fresh : q); add('Funniest quote', x.who, x.text); }
 
   // everyone: how they ended up, and one thing they will be remembered for
@@ -85,6 +89,13 @@ export function buildRecap(s) {
     if (p.alive && wounds >= 3) notes.push(`Survived ${wounds} injuries`);
     if (p.alive && p.hp === 1) notes.push('Made it out on their last bit of health');
     if (cx[p.id] >= 3) notes.push(`Volunteered for ${cx[p.id]} ridiculous plans`);
+    const z = p.zombie;
+    if (z?.times) {
+      const parts = [];
+      if (z.killed.length) parts.push(`killed ${z.killed.map(nm).join(' and ')}`);
+      if (z.hurt.length) parts.push(`injured ${z.hurt.map(nm).join(' and ')}`);
+      notes.unshift(`Came back as a zombie and ${parts.join(', then ')}. ${z.state === 'gone' ? 'Finally put to rest' : 'Still out there somewhere'}`);
+    }
     const status = p.alive ? (p.infected && p.infected.resolved !== 'cured' ? 'Survived... infected' : 'Survived') : 'Deceased';
     return { id: p.id, name: p.name, alive: p.alive, status, cause: p.alive ? '' : cap(p.cause || 'Unknown'), note: notes[0] || '' };
   });

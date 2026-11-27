@@ -11,6 +11,7 @@ const X = (id, sits, l, d, o, opt = {}) => ({ id, sits, l, d, o, tag: 'char', ..
 export const EXTRA = {
   leyla: {
     lines: {
+      returned: ['"No. Absolutely not. You do NOT get to come back, {d}."', '"I kept you alive for HOURS, {d}. And this is the thanks I get?"'],
       calm: ['"Does anyone have a sensible suggestion? Anyone? At all?"', '"I just want it noted that I said this was a bad idea. Earlier. Quietly. To myself."'],
       tense: ['"Okay, new rule: nobody does anything heroic without asking me first."'],
       mishap: ['"{v}. Of ALL the moments. Get up. GET UP."', '"I turn my back for ONE second."', '"Chat is never letting this go, {v}. Never."'],
@@ -33,6 +34,7 @@ export const EXTRA = {
 
   bravo: {
     lines: {
+      returned: ['"{d}! Old friend! Shall we negotiate?" ...No. No negotiating with {d}.', '"Nine lives and I still haven\'t used one. {d} used theirs in one go."'],
       calm: ['"I am a professional zombie negotiator. I have a business card. It is a leaf."', '"I have locked the door. Which door? All of them. Probably."'],
       tense: ['"Leave this to me! I have a terrible plan!"'],
       mishap: ['"In my defence, that would never happen to a cat. Oh. Wait."', '"{v}, I have nine lives and even I would not have tried that."', '"Shall I lick it better, {v}?"'],
@@ -60,6 +62,7 @@ export const EXTRA = {
 
   chris: {
     lines: {
+      returned: ['"Statistically, the odds of {d} finding us again were tiny. Tiny!"', '"I need a moment. And then I need a spreadsheet of everyone who might come back."'],
       calm: ['"I have calculated our odds. I have also decided not to share them."', '"Technically, that should have worked. I stand by the maths."'],
       tense: ['"I\'ve calculated this exactly! ...Roughly! Ish!"'],
       mishap: ['"Statistically, {v}, that was incredibly unlikely. Well done."', '"I\'m putting that in the incident report. Under \'embarrassing\'."', '"{v}, there were about four hundred safer ways to do that."'],
@@ -82,6 +85,7 @@ export const EXTRA = {
 
   hyrisha: {
     lines: {
+      returned: ['"{d}... I\'m so sorry. I\'m so, so sorry."'],
       mishap: ['"Oh no, {v}! Are you okay? I\'m not laughing! I\'m... I\'m laughing a tiny bit."', '"{v}, come here. Hug. Then we never speak of it."'],
       mishapdeath: ['"No... {v}... I should have been faster."'],
     },
@@ -99,6 +103,7 @@ export const EXTRA = {
 
   hiwi: {
     lines: {
+      returned: ['"I am NOT filming this. ...Okay, I filmed a bit."'],
       mishap: ['"I got that on video. I\'m not deleting it, {v}. It\'s evidence."', '"{v}, sit still. Medic coming. Camera also coming."'],
       mishapdeath: ['"I filmed everything today. I wish I hadn\'t filmed that."'],
     },
@@ -110,6 +115,7 @@ export const EXTRA = {
 
   dardan: {
     lines: {
+      returned: ['"Had a ram like that once. Wouldn\'t stay in the field either."'],
       calm: ['"We should head for the farmland. I\'ve waited my whole life for my skills to be useful."', '"You can tell a lot from a cowpat. You don\'t want to know what."'],
       mishap: ['"Did that to myself once with a gate. Different gate. Same face."', '"{v}, I\'ve seen a sheep do better. And sheep are idiots."'],
       mishapdeath: ['"Lost a good dog like that once. Stupid accident. Never got over it."'],
@@ -130,6 +136,7 @@ export const EXTRA = {
 
   sonila: {
     lines: {
+      returned: ['"That isn\'t {d}. {d} would never. Keep telling yourselves that."'],
       mishap: ['"{v}! Are you hurt? Show me. ...Okay, I\'m going to laugh later, but right now, let me look."', '"It\'s okay, {v}. It happens to everyone. It does not happen to everyone."'],
       mishapdeath: ['"I was right there. I was RIGHT THERE."'],
     },
@@ -140,6 +147,7 @@ export const EXTRA = {
 
   isma: {
     lines: {
+      returned: ['"Blocked. {d}, you are blocked. In this life AND the next."'],
       mishap: ['"Blocked. {v}, you are blocked. That was too embarrassing to be associated with."', '"Oh, I am screenshotting this memory forever, {v}."'],
       mishapdeath: ['"...I\'d unblock everyone in the world to undo that one."'],
     },
@@ -151,6 +159,7 @@ export const EXTRA = {
 
   doa: {
     lines: {
+      returned: ['"{d}... I saved you a slice of cake. I\'m not giving it to you now."'],
       mishap: ['"Oh {v}! Sit down, I\'ve got a biscuit somewhere. A biscuit fixes most things."', '"{v}, that was like the time I dropped a whole trifle. But worse. And on you."'],
       mishapdeath: ['"I was going to bake {v} a cake when this was over..."'],
     },
@@ -162,6 +171,7 @@ export const EXTRA = {
 
   toddy: {
     lines: {
+      returned: ['"Fair play, {d}. Even I wouldn\'t have come back for more."'],
       mishap: ['"Respect, {v}. That was almost as stupid as one of my plans."', '"That\'s going in the hall of fame, {v}. Right next to me."'],
       mishapdeath: ['"I always thought it\'d be me. Doing something daft. Not {v}."'],
     },
@@ -180,6 +190,7 @@ export const EXTRA = {
 
   hatice: {
     lines: {
+      returned: ['"Kheria hissed at the door. Kheria KNEW it was {d}."'],
       mishap: ['"Kheria, look away. Don\'t look at {v}. It\'s not for kittens."', '"{v}, even Kheria wouldn\'t have done that. And she eats plastic."'],
       mishapdeath: ['"Kheria loved {v}. She never sat on anyone else\'s feet like that."'],
     },
@@ -190,6 +201,7 @@ export const EXTRA = {
 
   gaza: {
     lines: {
+      returned: ['"{d} respawned on the wrong team. That\'s so unfair."'],
       mishap: ['"Bro just got clipped by real life, {v}. No respawn on that one. Well, there is. But still."', '"That\'s a fail compilation clip, {v}. Top three."'],
       mishapdeath: ['"No respawn... I keep saying it. I never thought about it."'],
     },
@@ -201,6 +213,7 @@ export const EXTRA = {
 
   loni: {
     lines: {
+      returned: ['"I\'ve always wanted a rematch with {d}. Not like this, though."'],
       mishap: ['"HA! {v}! I mean... are you okay? HA!"', '"{v}, if you wanted a fight that badly, you could have asked me."'],
       mishapdeath: ['"I wanted to go down swinging. {v} deserved that too."'],
     },
@@ -212,6 +225,7 @@ export const EXTRA = {
 
   ikram: {
     lines: {
+      returned: ['"I had a feeling we\'d see {d} again. I hate being right."'],
       mishap: ['"{v}. I saw that coming. I did not say anything. I regret nothing."', '"I have seen that happen once before. Also embarrassing."'],
       mishapdeath: ['"I didn\'t see that coming. I always see things coming."'],
     },
@@ -227,6 +241,7 @@ export const EXTRA = {
 export const BUDZ = {
   they: 'he', birthday: null, sign: null,
   lines: {
+    returned: ['"{d}... you have passed into the shadow. And come back out of it. Rude."', '"Not all who wander are lost. {d} is VERY lost."'],
     calm: ['"This is just like the old fantasy stories. A small fellowship, a long road, and a terrible dark tower at the end."', '"One does not simply walk into a shopping centre in the apocalypse. But we will."', '"We need a wizard. Has anyone got a wizard?"', '"I would follow any of you to the end of the world. Which is handy, because here it is."'],
     tense: ['"STAND, MY FRIENDS! STAND AND... no, actually, run. RUN!"', '"They shall not pass! ...They are passing. Okay. Plan B."', '"Remember the great battle at the fortress! Remember it!"'],
     win: ['"A victory worthy of song! I will write the song. It will be very long."', '"The fellowship holds! For now!"'],

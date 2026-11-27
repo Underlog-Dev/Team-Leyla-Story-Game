@@ -25,7 +25,7 @@
 setTimeout(async function () {
   var app = document.getElementById('app');
   if (!app || !app.querySelector('.loading')) return;
-  var need = ['adv-forest.js', 'adv-train.js', 'adv-voyage.js', 'adventures.js', 'app.js', 'avatar.js', 'banter.js', 'chaos-more.js', 'chaos.js', 'characters.js', 'crewbanter.js', 'engine.js', 'icons.js', 'kit.js', 'mishaps.js', 'persona.js', 'recap.js', 'rng.js', 'scenes.js', 'storage.js'];
+  var need = ['adv-forest.js', 'adv-train.js', 'adv-voyage.js', 'adventures.js', 'app.js', 'avatar.js', 'banter.js', 'chaos-more.js', 'chaos.js', 'characters.js', 'crewbanter.js', 'engine.js', 'icons.js', 'kit.js', 'mishaps.js', 'persona.js', 'recap.js', 'returners.js', 'rng.js', 'scenes.js', 'storage.js'];
   var missing = [];
   for (var i = 0; i < need.length; i++) {
     try { var r = await fetch(need[i] + '?check=' + Date.now(), { cache: 'no-store' }); if (!r.ok) missing.push(need[i]); } catch (e) { missing.push(need[i]); }
